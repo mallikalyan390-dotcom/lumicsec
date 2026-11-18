@@ -75,6 +75,16 @@ Exact `main` code commit `db2d7d61ff767e861367171a9f7fd38806666d6e` includes the
 
 Status: organization and **pending** asset persistence is implemented and verified by CI and database-policy tests. Hosted Google OAuth + mandatory TOTP E2E, membership management, domain ownership verification, scanners, reports, monitoring and billing are NOT complete. No production deployment or paid resources were used.
 
+## MFA QR and safe unverified-factor recovery checkpoint
+
+On 2026-11-18, reviewed Supabase's current TOTP JavaScript reference and GoTrue JS source. An enrollment QR from Supabase JS is **already an SVG image Data URL**; the previous React code incorrectly added a second Data URL prefix and percent-encoded the original string. The frontend now passes the original bounded/validated image source to the browser and offers an explicit safe regeneration action.
+
+A second enrollment-blocking issue was corrected: Supabase `listFactors().totp` lists verified factors, whereas new unverified TOTP factors are in `listFactors().all`. The verifier selects the exact user's unverified LumicSec factor via the HTTP-only pending cookie, fails closed on stale cookies, and checks that MFA verification actually reaches AAL2. Replacement cleans only app-owned unverified factors. Verified factors and unrelated factors are never automatically deleted; enrolling an additional factor requires AAL2.
+
+New tests cover QR format validation, factor selection, Fastify enrollment/verification behavior and protected Google+AAL2 customer API gates, using **mocked Supabase responses**. Controlled, secret-free synthetic SVG images were tested in actual local Chromium (direct Data URL loaded, double-prefixed image failed) and Firefox/Xvfb (direct image rendered with 32,400 dark pixels in the fixture region; double-prefixed image 60 dark pixels). Local hosted Google OAuth with a real authenticator was **not** performed. A previous exposed QR must be rotated at the next authorized live enrollment; no founder login factor was remotely modified.
+
+See `docs/security/mfa-enrollment-qualification.md` for test methodology, handling of previously exposed enrollment secrets, and the remaining **production-blocking** hosted authentication checks (real QR scan, session refresh/expiry, logout/login challenge, recovery, device/session management). No Supabase schema changes or deployments were required for this checkpoint.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.
@@ -86,7 +96,7 @@ The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-1
 | Source branch inventory and engine qualification matrix | PARTIAL | 47 source heads inspected, source evidence reviewed; complete historical lineage still pending |
 | Monorepo and developer infrastructure | VERIFIED ON f5c566b | CI 44314223186 and lockfile verification 44314223183 SUCCESS; new changes need fresh checks |
 | Supabase PostgreSQL schema / tenant RLS | INITIAL DEVELOPMENT FOUNDATION VERIFIED | 6 tables, 10 RLS policies, no advisor lints, cross-tenant transactional SQL tests passed; session-level E2E and memberships administration pending |
-| Google OAuth + mandatory TOTP | SCAFFOLD ONLY | Hosted provider settings, PKCE callback, AAL2 E2E, recovery-code implementation |
+| Google OAuth + mandatory TOTP | QR RENDERING + ENROLLMENT REGRESSION CODE TESTED; HOSTED E2E PENDING | Direct QR data source, pending factor rotation and AAL2 gate tests; real Google/Auth-app E2E and recovery codes remain blockers |
 | Customer dashboard and organizations | PERSISTENCE CODE AND CI VERIFIED; HOSTED E2E PENDING | Organization and pending asset API + React UI, user-scoped Supabase RLS, CI 44325014580 SUCCESS and SQL isolation PASS; live Google Auth E2E, domain verification and invitations not complete |
 | Platform admin dashboard | NOT IMPLEMENTED | Server-controlled platform roles, immutable audit evidence |
 | Web Security engine | OFFLINE PASSIVE MODULES PORTED | Ownership verification and SSRF-safe transport required before live scanning |

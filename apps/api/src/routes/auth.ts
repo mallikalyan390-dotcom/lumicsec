@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { mfaCodeSchema } from "@lumicsec/validation";
+import { isTrustedTotpQrImageDataUrl, mfaCodeSchema } from "@lumicsec/validation";
 import { cookieSecure, env } from "../env.js";
 import { ensureCsrfToken } from "../lib/csrf.js";
 import { isGoogleIdentity, isGoogleAal2 } from "../lib/auth-policy.js";
+import { managedUnverifiedTotp, selectTotpChallengeFactor } from "../lib/mfa-factors.js";
 import { clearLumicSecCookie, createSupabaseForRequest } from "../lib/supabase.js";
 
 function setPendingFactorCookie(reply: FastifyReply, factorId: string) {
@@ -144,6 +145,17 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "AAL2_REQUIRED_TO_ADD_BACKUP_FACTOR" });
     }
 
+    // Rotate abandoned factors from this app only. Other providers' factors and
+    // ALL verified factors remain intact. Never use admin privileges here.
+    for (const factor of managedUnverifiedTotp(factors)) {
+      const { error: cleanupError } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      if (cleanupError) {
+        request.log.warn({ errorCode: cleanupError.code }, "Abandoned enrollment cleanup failed");
+        return reply.code(503).send({ error: "MFA_ENROLLMENT_CLEANUP_FAILED" });
+      }
+    }
+    clearLumicSecCookie(reply, "lumicsec_pending_totp");
+
     const friendlyName = "LumicSec Authenticator " + randomBytes(2).toString("hex");
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
@@ -153,6 +165,16 @@ export async function authRoutes(app: FastifyInstance) {
     if (error || !data?.totp?.qr_code || !data.totp.secret) {
       request.log.warn({ errorCode: error?.code }, "TOTP enrollment failed");
       return reply.code(400).send({ error: "TOTP_ENROLLMENT_FAILED" });
+    }
+
+    if (!isTrustedTotpQrImageDataUrl(data.totp.qr_code)) {
+      // Do not return an invalid or potentially unsafe image URL to the browser.
+      // Remove only the factor we just created; keep every verified factor.
+      const { error: cleanupError } = await supabase.auth.mfa.unenroll({ factorId: data.id });
+      if (cleanupError) {
+        request.log.warn({ errorCode: cleanupError.code }, "Invalid QR enrollment cleanup failed");
+      }
+      return reply.code(502).send({ error: "TOTP_QR_FORMAT_UNSUPPORTED" });
     }
 
     setPendingFactorCookie(reply, data.id);
@@ -184,12 +206,15 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const pendingFactorId = request.cookies?.["lumicsec_pending_totp"];
-    const factor = pendingFactorId
-      ? factorData.totp.find((item) => item.id === pendingFactorId)
-      : factorData.totp.find((item) => item.status === "verified");
+    const factor = selectTotpChallengeFactor(factorData, pendingFactorId);
 
     if (!factor) {
-      return reply.code(409).send({ error: "TOTP_FACTOR_NOT_FOUND" });
+      if (pendingFactorId) {
+        clearLumicSecCookie(reply, "lumicsec_pending_totp");
+      }
+      return reply.code(409).send({
+        error: pendingFactorId ? "TOTP_ENROLLMENT_EXPIRED_REGENERATE" : "TOTP_FACTOR_NOT_FOUND",
+      });
     }
 
     const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({

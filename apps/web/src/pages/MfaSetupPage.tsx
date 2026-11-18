@@ -5,7 +5,7 @@ import { KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { AuthSessionResponse } from "@lumicsec/shared";
-import { mfaCodeSchema } from "@lumicsec/validation";
+import { isTrustedTotpQrImageDataUrl, mfaCodeSchema } from "@lumicsec/validation";
 import { postJson } from "../lib/api.js";
 import { Button } from "../components/ui/Button.js";
 import { Card, CardContent } from "../components/ui/Card.js";
@@ -16,10 +16,15 @@ type Enrollment = { qrCodeSvg: string; secret: string };
 
 export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [qrFailed, setQrFailed] = useState(false);
   const queryClient = useQueryClient();
   const enroll = useMutation({
     mutationFn: () => postJson<Enrollment>("/auth/mfa/enroll", {}, session.csrfToken),
-    onSuccess: setEnrollment,
+    onSuccess: (value) => {
+      setQrFailed(false);
+      setEnrollment(value);
+      form.reset();
+    },
   });
   const verify = useMutation({
     mutationFn: (code: string) => postJson<{ verified: boolean }>("/auth/mfa/verify", { code }, session.csrfToken),
@@ -32,9 +37,8 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
     defaultValues: { code: "" },
   });
 
-  const qrSource = enrollment
-    ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(enrollment.qrCodeSvg)
-    : "";
+  const qrSource = enrollment?.qrCodeSvg ?? "";
+  const qrValid = isTrustedTotpQrImageDataUrl(qrSource);
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#080d19] px-5 py-10 text-slate-100">
@@ -50,7 +54,9 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
           ) : (
             <div className="mt-7 grid gap-6 sm:grid-cols-[180px_1fr]">
               <div className="grid min-h-44 place-items-center rounded-2xl bg-white p-3">
-                <img src={qrSource} alt="Authenticator enrollment QR code" className="h-40 w-40" />
+                {qrValid && !qrFailed
+                  ? <img src={qrSource} alt="Authenticator enrollment QR code" className="h-40 w-40" onError={() => setQrFailed(true)} />
+                  : <p role="alert" className="text-center text-xs text-rose-700">QR image unavailable. Generate a fresh authenticator code below.</p>}
               </div>
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Manual setup key</div>
@@ -61,16 +67,23 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
           )}
 
           {enrollment ? (
+            <Button className="mt-4 w-full" onClick={() => enroll.mutate()} disabled={enroll.isPending || verify.isPending}>
+              {enroll.isPending ? "Replacing setup…" : "Discard setup and generate a fresh QR"}
+            </Button>
+          ) : null}
+
+          {enrollment && qrValid && !qrFailed ? (
             <form className="mt-7 space-y-3" onSubmit={form.handleSubmit((values) => verify.mutate(values.code))}>
               <label className="block text-sm font-medium text-slate-200" htmlFor="totp-code">Six-digit authenticator code</label>
               <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" {...form.register("code")} />
               {form.formState.errors.code ? <p className="text-xs text-rose-300">{form.formState.errors.code.message}</p> : null}
-              {verify.isError ? <p className="text-xs text-rose-300">{verify.error.message}</p> : null}
+              {verify.isError ? <p role="alert" className="text-xs text-rose-300">{verify.error.message}</p> : null}
               <Button className="w-full" type="submit" disabled={verify.isPending}>{verify.isPending ? "Verifying…" : "Verify and continue"}</Button>
             </form>
           ) : null}
 
-          {enroll.isError ? <p className="mt-4 text-xs text-rose-300">{enroll.error.message}</p> : null}
+          {enroll.isError ? <p role="alert" className="mt-4 text-xs text-rose-300">{enroll.error.message}</p> : null}
+          {enrollment ? <p className="mt-3 text-xs text-slate-400">If this setup was previously displayed, abandoned or exposed, do not reuse it. Refreshing the page and choosing Create authenticator replaces the previous unverified LumicSec factor. Never share this QR or manual key.</p> : null}
           <div className="mt-6 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100">
             <KeyRound size={15} className="mt-0.5 shrink-0" />
             <span>Single-use recovery codes are not available yet. Do not use this build for production accounts until the custom recovery-code milestone is complete. Registering a second authenticator factor is planned.</span>
