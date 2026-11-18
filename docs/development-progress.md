@@ -85,6 +85,18 @@ New tests cover QR format validation, factor selection, Fastify enrollment/verif
 
 See `docs/security/mfa-enrollment-qualification.md` for test methodology, handling of previously exposed enrollment secrets, and the remaining **production-blocking** hosted authentication checks (real QR scan, session refresh/expiry, logout/login challenge, recovery, device/session management). No Supabase schema changes or deployments were required for this checkpoint.
 
+### MFA QR code checkpoint — verified GitHub-hosted evidence
+
+Exact `main` code commit: `335766c31d20736538f91ded91b130039d78f02e`, created from the nine-file locally tested tree `91fdc36e5e27b33100e38f3d8ef9cd11960f3879`. Every new GitHub blob SHA matched its locally committed blob before advancing `main`; the change was a non-force fast-forward.
+
+- [CI run 44333300508](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44333300508): **SUCCESS**, one quality job / 16 successful steps.
+- [Lockfile verification run 44333300598](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44333300598): **SUCCESS**, one frozen-lockfile job / 11 successful steps.
+- Local (8GB-class Linux, Node 26.13.0 / pnpm 12.19.0): frozen install, builds, lint, TypeScript checks, **62/62 tests**, production dependency audit and whitespace validation all PASS.
+- Browser fixture: Chromium headless and Firefox via Xvfb both rendered the direct SVG Data URL and rejected the previous double-prefixed format. These synthetic browser tests did not touch real MFA factors.
+- No schema, production infrastructure, billing, DNS, or live authentication factor was altered. Recovery codes, real Google OAuth with authenticator scan, actual AAL2 hosted E2E, session-revocation testing, and full customer onboarding security qualification are still blocked/pending.
+
+Documentation-only updates after the code commit require their own exact-SHA GitHub Actions verification; do not reuse prior run IDs as proof for newer commits.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.
