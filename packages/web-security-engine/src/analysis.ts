@@ -101,7 +101,6 @@ export function analyzeWebAssessmentSnapshot(s:AnalysisSnapshot):AnalysisProject
  const captureKinds=new Set<RuleCategory>();
  const sorted=[...s.nodes].sort((a,b)=>a.id.localeCompare(b.id));
  const pages=sorted.filter(n=>n.kind==="PAGE"&&n.state==="OBSERVED");
- const source=(n:AnalysisNode)=>({sourceNodeIds:[n.id],sourceFingerprints:[n.sourceFingerprint]});
  function add(ruleId:string,category:RuleCategory,outcome:RuleOutcome,title:string,
    explanation:string,remediation:string,validation:string,
    nodes:readonly AnalysisNode[],opts?:Readonly<{strength?:EvidenceStrength;confidence?:"LOW"|"MEDIUM"|"HIGH";

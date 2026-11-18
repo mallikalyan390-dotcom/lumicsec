@@ -60,7 +60,8 @@ export function buildApp() {
 
   app.setErrorHandler(async (error, request, reply) => {
     request.log.error({ err: error }, "Unhandled API error");
-    const status = typeof error.statusCode === "number" && error.statusCode >= 400 ? error.statusCode : 500;
+    const reportedStatus = error !== null && typeof error === "object" && "statusCode" in error ? error.statusCode : undefined;
+    const status = typeof reportedStatus === "number" && reportedStatus >= 400 ? reportedStatus : 500;
     return reply.code(status).send({
       error: status >= 500 ? "INTERNAL_ERROR" : "REQUEST_FAILED",
       requestId: request.id,

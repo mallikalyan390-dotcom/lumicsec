@@ -18,10 +18,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const payload: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
     const record = payload !== null && typeof payload === "object" ? payload as Record<string, unknown> : {};
-    const message = typeof record.message === "string"
-      ? record.message
-      : typeof record.error === "string"
-        ? record.error
+    const message = typeof record["message"] === "string"
+      ? record["message"]
+      : typeof record["error"] === "string"
+        ? record["error"]
         : "The request could not be completed.";
     throw new Error(message);
   }

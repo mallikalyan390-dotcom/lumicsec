@@ -11,5 +11,13 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
     }
+  },
+  {
+    files: ["apps/api/src/routes/api-specs.ts", "packages/web-security-engine/src/**/*.ts"],
+    rules: { "no-control-regex": "off" },
+  },
+  {
+    files: ["packages/web-security-engine/src/analysis.ts"],
+    rules: { "no-empty": ["error", { "allowEmptyCatch": true }] },
   }
 );

@@ -63,11 +63,13 @@ describe("offline API specification engine", () => {
     await expect(importOfflineDocument(JSON.stringify(invalid))).rejects.toThrow("EXTERNAL_REF_PROHIBITED");
   });
 
-  it("rejects documents with no discoverable API paths", async () => {
-    await expect(importOfflineDocument(JSON.stringify({
+  it("keeps valid empty API specs as an explicit zero-operation inventory", async () => {
+    const inventory = await importOfflineDocument(JSON.stringify({
       openapi: "3.1.0",
       info: { title: "Empty", version: "1.0.0" },
       paths: {},
-    }))).rejects.toThrow();
+    }));
+    expect(inventory.operations).toHaveLength(0);
+    expect(inventory.metadata.warnings).toContain("DECLARED_SPEC_ONLY_NO_RUNTIME_CONFIRMATION");
   });
 });

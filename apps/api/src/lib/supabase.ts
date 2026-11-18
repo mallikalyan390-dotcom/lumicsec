@@ -21,7 +21,7 @@ export function createSupabaseForRequest(request: FastifyRequest, reply: Fastify
     },
     cookies: {
       getAll() {
-        return Object.entries(request.cookies ?? {}).map(([name, value]) => ({ name, value }));
+        return Object.entries(request.cookies ?? {}).flatMap(([name, value]) => typeof value === "string" ? [{ name, value }] : []);
       },
       setAll(cookiesToSet) {
         for (const cookie of cookiesToSet) {

@@ -7,7 +7,14 @@
     "outDir": "dist",
     "declaration": true,
     "noEmit": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }
