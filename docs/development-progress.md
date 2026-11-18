@@ -62,7 +62,18 @@ The checked-in `supabase/tests/tenant-isolation.sql` was executed on that develo
 
 Customer feature code now includes a React Organizations & Assets page and tenant-scoped Fastify GET/POST endpoints. Assets can only be registered as PENDING, and browser roles cannot mark them verified. The origin validator performs no DNS or network requests. Live OAuth/TOTP, invitations, domain ownership verification, scanner workers and commercial customer E2E remain pending. The development database policy test is not a replacement for hosted end-to-end authorization testing.
 
-Local validation after these changes: frozen installation, lint, typecheck, all 37 unit tests, production builds and production dependency audit PASSED on Node 26.13.0 / pnpm 12.19.0 (8GB-class Linux machine). New feature commit GitHub checks still require verification.
+Local validation after these changes: frozen installation, lint, typecheck, all 37 unit tests, production builds and production dependency audit PASSED on Node 26.13.0 / pnpm 12.19.0 (8GB-class Linux machine). GitHub-hosted checks for the tenant/customer code milestone are now successful; see exact run evidence below.
+
+## Tenant workflow GitHub-hosted verification
+
+Exact `main` code commit `db2d7d61ff767e861367171a9f7fd38806666d6e` includes the version-controlled migration `20261118133942_tenant_rls_foundation.sql`, rollback-only SQL test, Fastify customer organization/asset endpoints, HTTPS origin validator, React asset UI, tests and documentation. All 23 updated GitHub blob SHAs matched the locally staged Git blobs.
+
+- [CI run 44325014580](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44325014580) **SUCCESS** for this exact commit: frozen install, workspace compilation, lint, TypeScript, 37 unit tests, production builds, production dependency audit and secret scanning.
+- [Lockfile verification run 44325014585](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44325014585) **SUCCESS** for the same commit: frozen install and unchanged lockfile.
+- Local 8 GB-class Linux development check: Node 26.13.0 and pnpm 12.19.0; frozen install, build, lint, typecheck, 37/37 unit tests and production dependency audit passed.
+- Supabase `lumicsec-local`: migration `20261118133942` previously applied once; six RLS-enabled tables, ten policies and no security advisor lints. Two-user tenant-isolation SQL test passed in a rollback-only transaction. **This database SQL test was not run by GitHub CI.**
+
+Status: organization and **pending** asset persistence is implemented and verified by CI and database-policy tests. Hosted Google OAuth + mandatory TOTP E2E, membership management, domain ownership verification, scanners, reports, monitoring and billing are NOT complete. No production deployment or paid resources were used.
 
 ## Known security advisory
 
@@ -76,7 +87,7 @@ The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-1
 | Monorepo and developer infrastructure | VERIFIED ON f5c566b | CI 44314223186 and lockfile verification 44314223183 SUCCESS; new changes need fresh checks |
 | Supabase PostgreSQL schema / tenant RLS | INITIAL DEVELOPMENT FOUNDATION VERIFIED | 6 tables, 10 RLS policies, no advisor lints, cross-tenant transactional SQL tests passed; session-level E2E and memberships administration pending |
 | Google OAuth + mandatory TOTP | SCAFFOLD ONLY | Hosted provider settings, PKCE callback, AAL2 E2E, recovery-code implementation |
-| Customer dashboard and organizations | INITIAL PERSISTENT WORKFLOW CODED | Create/list organizations and pending assets via user-scoped Supabase RLS, React UI, unit tests; hosted Google Auth E2E, ownership verification, invitations not complete |
+| Customer dashboard and organizations | PERSISTENCE CODE AND CI VERIFIED; HOSTED E2E PENDING | Organization and pending asset API + React UI, user-scoped Supabase RLS, CI 44325014580 SUCCESS and SQL isolation PASS; live Google Auth E2E, domain verification and invitations not complete |
 | Platform admin dashboard | NOT IMPLEMENTED | Server-controlled platform roles, immutable audit evidence |
 | Web Security engine | OFFLINE PASSIVE MODULES PORTED | Ownership verification and SSRF-safe transport required before live scanning |
 | API Security engine | SPEC_ONLY MODULES PORTED | Live API authorization worker requires separate qualification |
@@ -86,7 +97,7 @@ The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-1
 
 ## Next acceptance gates
 
-1. Verify both GitHub-hosted workflows for the next exact `main` commit containing the tenant migration and customer code; resolve any failure.
+1. Keep both workflows green on each new `main` commit, confirming the exact SHA. Hosted security E2E is required before any customer onboarding.
 2. Configure Google-only OAuth and complete hosted PKCE + mandatory TOTP E2E, recovery codes, session revocation and cross-tenant browser tests before live user onboarding.
 3. Implement a safe ownership challenge, verification lifecycle, secure role-controlled membership administration and audit trail.
 4. Only then qualify bounded, authorized passive scanners, canonical findings, reporting, monitoring, billing and admin features; no customer scanner or worker may bypass these release gates.
