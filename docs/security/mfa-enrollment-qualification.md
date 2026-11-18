@@ -64,3 +64,11 @@ Actual local browser evidence, 2026-11-18:
 A separate API regression test suite verifies Google-only OAuth callback route initiation, code exchange and failure redirects, JWT/assurance AAL1 denial, AAL2 positive branch, session failures, and sign-out **with mocks only**. Protected workspace access for unauthenticated requests was additionally denied by the actual local Fastify API (401).
 
 **Release blockers remain:** founder-assisted hosted Google login, live authenticator enrollment with a **fresh** never-exposed key, real TOTP scanning/code acceptance, current and next AAL checks, protected tenant API access with a real authenticated session, real logout/re-login, token refresh/expiry and revocation propagation, rate-limit/failed-code checks under hosted behavior, audited single-use recovery codes, and safe backup authenticator/re-enrollment management. Supabase's built-in MFA APIs do not themselves implement this application's required recovery codes; recovery cannot be described as complete without a designed private schema and tested protections. No founder factor was modified by these validations.
+
+## Non-login OAuth redirect verification (not a full login)
+
+A read-only inspection of the active local API's `/auth/google` route showed an HTTP 302 to the expected Supabase project authorize endpoint, with `provider=google`, PKCE `S256`, a code challenge and a callback URL. One further **non-followed** authorization request to Supabase redirected with HTTP 302 to `accounts.google.com`. OAuth URLs, challenge parameters and all cookies were deliberately excluded from agent-visible output. No real user login or factors were touched.
+
+This establishes that the Google authorization **handoff** is configured, not that consent, callback code exchange, browser cookie policy, token refresh, authenticator challenge or AAL2 work against the hosted provider. The latter require founder-assisted interactive tests and must remain release blockers.
+
+Code checkpoint `ce4c5dc5d7b3261f1a0f11fbfd0a59865e24529a` passed GitHub [CI 44338785713](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785713) and [lockfile verification 44338785783](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785783).

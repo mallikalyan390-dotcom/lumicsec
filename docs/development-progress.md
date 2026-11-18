@@ -109,6 +109,19 @@ The controlled optional browser fixture `apps/web/tests/mfa-manual-fallback-smok
 
 The API OAuth/session regression suite now additionally covers Google-only OAuth initiation, callback success/error handling, AAL1/AAL2 session gating, unavailable session claims and sign-out through mocked Supabase methods. Real session revocation propagation, live factors, recovery codes, backup authenticator management, hosted PKCE and actual device re-login/expiry tests are **still unverified or unimplemented**. See `docs/security/mfa-enrollment-qualification.md`. Do not onboard production customers on this basis.
 
+### Active checkout and MFA manual fallback — GitHub-hosted checkpoint
+
+Exact `main` code commit `ce4c5dc5d7b3261f1a0f11fbfd0a59865e24529a`. The GitHub tree `acb9c7dd52388b714edb8d63ee40723857fa906a` was identical to the locally committed, tested tree before the non-force remote ref update. The active local checkout was aligned to that exact GitHub commit by an atomic local Git ref update **only after proving both commits had an identical tree and parent**. No working-tree reset or file overwrite occurred, and `main` remained clean.
+
+- [GitHub CI run 44338785713](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785713): **SUCCESS**; 16 workflow steps passed.
+- [GitHub lockfile verification run 44338785783](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785783): **SUCCESS**; 11 workflow steps passed.
+- Local actual folder `/home/kalyan/lumicsec`: frozen install, full build, lint, TypeScript, **71/71 tests**, production dependency audit, and Git diff whitespace check: **PASS**. Vite displayed a nonfatal bundle chunk-size optimization warning (>500 KB).
+- Synthetic browser UI test: Firefox and Chromium each passed valid-QR and broken-QR scenarios (4/4), including visible manual key/instructions, accessible six-digit verification form, and simulated rejected-code feedback. No real factor or secret was used.
+- Local API negative checks: `/healthz` HTTP 200, `/v1/organizations` without user HTTP 401, failed callback HTTP 302, unauthenticated `/auth/session` returns `anonymous`. Frontend HTTP 200. Both real services remain in the correct active folder.
+- Non-login hosted authorization redirect inspection: `/auth/google` HTTP 302 to the configured Supabase `/auth/v1/authorize` with `provider=google` and PKCE `code_challenge_method=S256`; a single non-followed Supabase authorize request returned HTTP 302 to `accounts.google.com`. **No Google user sign-in, callback code exchange, current-user AAL2, token revocation, or real TOTP enrollment was qualified by this test.**
+
+The custom single-use recovery-code scheme, AAL2-protected backup authenticator management, verified-factor rotation and session revocation propagation remain **required but incomplete**. The previously exposed QR secret must never be reused. No database migrations, live factor changes, production deployments or paid services occurred in this checkpoint. This exact code SHA has hosted CI evidence; any later docs-only commit needs fresh checks.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.
