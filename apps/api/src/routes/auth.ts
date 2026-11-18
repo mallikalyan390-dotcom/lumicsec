@@ -122,6 +122,44 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.redirect(appUrl.toString());
   });
 
+  // Read-only MFA inventory: AAL2 is required server-side. The endpoint
+  // exposes no secrets, provisioning URLs, unverified factors or delete action.
+  app.get("/auth/mfa/factors", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const supabase = createSupabaseForRequest(request, reply);
+    if (!supabase) return reply.code(503).send({ error: "AUTH_NOT_CONFIGURED" });
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user || !isGoogleIdentity(userData.user)) {
+      return reply.code(401).send({ error: "GOOGLE_AUTHENTICATION_REQUIRED" });
+    }
+
+    const [claimsResult, assuranceResult] = await Promise.all([
+      supabase.auth.getClaims(), supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+    ]);
+    if (claimsResult.error || assuranceResult.error || !claimsResult.data?.claims || !assuranceResult.data) {
+      return reply.code(401).send({ error: "SESSION_VERIFICATION_FAILED" });
+    }
+    if (!isGoogleAal2(userData.user, claimsResult.data.claims, assuranceResult.data)) {
+      return reply.code(403).send({ error: "AAL2_REQUIRED" });
+    }
+
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    if (factorsError || !factors) {
+      return reply.code(503).send({ error: "MFA_STATUS_UNAVAILABLE" });
+    }
+    return {
+      verifiedTotpFactors: factors.totp
+        .filter((factor) => factor.factor_type === "totp" && factor.status === "verified")
+        .map((factor) => ({
+          id: factor.id,
+          friendlyName: factor.friendly_name ?? "Authenticator",
+        })),
+    };
+  });
+
   app.post("/auth/mfa/enroll", {
     config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
   }, async (request, reply) => {
@@ -142,8 +180,11 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const verified = factors.totp.filter((factor) => factor.status === "verified");
-    if (verified.length > 0 && assurance.currentLevel !== "aal2") {
-      return reply.code(403).send({ error: "AAL2_REQUIRED_TO_ADD_BACKUP_FACTOR" });
+    if (verified.length > 0) {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+      if (claimsError || !claimsData?.claims || !isGoogleAal2(userData.user, claimsData.claims, assurance)) {
+        return reply.code(403).send({ error: "AAL2_REQUIRED_TO_ADD_BACKUP_FACTOR" });
+      }
     }
 
     // Rotate abandoned factors from this app only. Other providers' factors and

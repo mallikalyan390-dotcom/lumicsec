@@ -14,7 +14,11 @@ import { Input } from "../components/ui/Input.js";
 const formSchema = z.object({ code: mfaCodeSchema });
 type Enrollment = { qrCodePng?: string | null; qrCodeSvg: string | null; secret: string };
 
-export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
+export function MfaSetupPage({ session, mode = "initial", onVerified }: {
+  session: AuthSessionResponse;
+  mode?: "initial" | "backup";
+  onVerified?: () => void;
+}) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [qrFailed, setQrFailed] = useState(false);
   const queryClient = useQueryClient();
@@ -30,6 +34,7 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
     mutationFn: (code: string) => postJson<{ verified: boolean }>("/auth/mfa/verify", { code }, session.csrfToken),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["auth-session"] });
+      onVerified?.();
     },
   });
   const form = useForm<z.infer<typeof formSchema>>({
@@ -45,10 +50,12 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
   const qrValid = isTrustedTotpPngDataUrl(qrSource) || isTrustedTotpQrImageDataUrl(qrSource);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#080d19] px-5 py-10 text-slate-100">
+    <section className={mode === "backup"
+      ? "grid place-items-center py-3 text-slate-100"
+      : "grid min-h-screen place-items-center bg-[#080d19] px-5 py-10 text-slate-100"}>
       <Card className="w-full max-w-xl">
         <CardContent className="p-7 sm:p-9">
-          <div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200"><ShieldCheck size={22} /></div><div><div className="text-xs uppercase tracking-[0.2em] text-cyan-200">Required security step</div><h1 className="mt-1 text-2xl font-semibold text-white">Set up your authenticator</h1></div></div>
+          <div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200"><ShieldCheck size={22} /></div><div><div className="text-xs uppercase tracking-[0.2em] text-cyan-200">{mode === "backup" ? "Additional AAL2 factor" : "Required security step"}</div><h1 className="mt-1 text-2xl font-semibold text-white">{mode === "backup" ? "Set up a backup authenticator" : "Set up your authenticator"}</h1></div></div>
           <p className="mt-5 text-sm leading-6 text-slate-400">Scan the QR code with Google Authenticator, Microsoft Authenticator, Authy or 1Password. Enter the six-digit code to verify enrollment.</p>
 
           {!enrollment ? (
@@ -95,6 +102,6 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
           </div>
         </CardContent>
       </Card>
-    </main>
+    </section>
   );
 }

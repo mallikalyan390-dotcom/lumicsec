@@ -67,6 +67,64 @@ describe("Google TOTP MFA API regression", () => {
     mocks.currentClient = null;
   });
 
+  it("returns only verified factor labels to an AAL2 Google/TOTP session", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({
+      data: { all: [pending, verified, other], totp: [verified] }, error: null,
+    });
+    const instance = await app();
+    const response = await instance.inject({ method: "GET", url: "/auth/mfa/factors" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ verifiedTotpFactors: [
+      { id: "existing-verified", friendlyName: "LumicSec Authenticator backup" },
+    ] });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("denies AAL1 factor inventory and never calls listFactors", async () => {
+    supabase.auth.getClaims.mockResolvedValue({
+      data: { claims: { aal: "aal1", amr: [{ method: "oauth" }] } }, error: null,
+    });
+    const instance = await app();
+    const response = await instance.inject({ method: "GET", url: "/auth/mfa/factors" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "AAL2_REQUIRED" });
+    expect(supabase.auth.mfa.listFactors).not.toHaveBeenCalled();
+  });
+
+  it("denies non-Google primary identity access to factor inventory", async () => {
+    supabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: "test-user", app_metadata: { provider: "email", providers: ["google", "email"] } } },
+      error: null,
+    });
+    const instance = await app();
+    const response = await instance.inject({ method: "GET", url: "/auth/mfa/factors" });
+    expect(response.statusCode).toBe(401);
+    expect(supabase.auth.mfa.listFactors).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when factor-inventory JWT verification fails", async () => {
+    supabase.auth.getClaims.mockResolvedValue({ data: null, error: { code: "token_expired" } });
+    const instance = await app();
+    const response = await instance.inject({ method: "GET", url: "/auth/mfa/factors" });
+    expect(response.statusCode).toBe(401);
+    expect(supabase.auth.mfa.listFactors).not.toHaveBeenCalled();
+  });
+
+  it("does not enroll a backup with a forged AAL2 claim missing TOTP proof", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({
+      data: { all: [verified], totp: [verified] }, error: null,
+    });
+    supabase.auth.getClaims.mockResolvedValue({
+      data: { claims: { aal: "aal2", amr: [{ method: "oauth" }] } }, error: null,
+    });
+    const instance = await app();
+    const response = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(response.statusCode).toBe(403);
+    expect(supabase.auth.mfa.enroll).not.toHaveBeenCalled();
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
   it("rotates only own unverified factor before a fresh enrollment", async () => {
     const instance = await app();
     const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });

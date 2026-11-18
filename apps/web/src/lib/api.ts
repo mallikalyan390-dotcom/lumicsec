@@ -62,3 +62,11 @@ export function getAssets(organizationId: string) {
     "/v1/assets?organizationId=" + encodeURIComponent(organizationId),
   );
 }
+
+/** Verified factors only; this response intentionally never includes TOTP keys. */
+export type VerifiedTotpFactor = { id: string; friendlyName: string };
+export type VerifiedTotpFactorsResponse = { verifiedTotpFactors: VerifiedTotpFactor[] };
+
+export function getVerifiedTotpFactors() {
+  return requestJson<VerifiedTotpFactorsResponse>("/auth/mfa/factors");
+}

@@ -4,6 +4,7 @@ import { AuthGate } from "./components/AuthGate.js";
 import { ApiSecurityPage } from "./pages/ApiSecurityPage.js";
 import { OverviewPage } from "./pages/OverviewPage.js";
 import { AssetsPage } from "./pages/AssetsPage.js";
+import { AccountSecurityPage } from "./pages/AccountSecurityPage.js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ export function App() {
           <Route path="/app" element={<AuthGate><OverviewPage /></AuthGate>} />
           <Route path="/app/api-security" element={<AuthGate><ApiSecurityPage /></AuthGate>} />
           <Route path="/app/assets" element={<AuthGate><AssetsPage /></AuthGate>} />
+          <Route path="/app/account-security" element={<AuthGate><AccountSecurityPage /></AuthGate>} />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Routes>
       </BrowserRouter>

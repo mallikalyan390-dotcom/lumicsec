@@ -27,10 +27,18 @@ const browserHarness = `<script>
     }
     throw new Error("Fixture UI condition not reached");
   };
-  const report = { browser: navigator.userAgent.includes("Firefox") ? "firefox" : "chromium", fixture: location.search.includes("valid") ? "valid" : "broken" };
+  const report = { browser: navigator.userAgent.includes("Firefox") ? "firefox" : "chromium", fixture: location.search.includes("valid") ? "valid" : "broken", backup: location.search.includes("backup") };
   try {
+    report.stage = "session_ready";
+    if (report.backup) {
+      report.stage = "backup_button";
+      const addBackup = await waitFor(() => [...document.querySelectorAll("button")].find((button) => button.textContent.includes("Add backup authenticator") && !button.disabled));
+      addBackup.click();
+      report.stage = "create_button";
+    }
     const create = await waitFor(() => [...document.querySelectorAll("button")].find((button) => button.textContent.includes("Create authenticator")));
     create.click();
+    report.stage = "verification_field";
     const input = await waitFor(() => document.querySelector("#totp-code"));
     const qrAlert = report.fixture === "broken"
       ? !!(await waitFor(() => document.body.textContent.includes("QR image unavailable")))
@@ -53,6 +61,9 @@ const browserHarness = `<script>
       document.body.textContent.includes("MFA_VERIFICATION_FAILED")));
   } catch (error) {
     report.problem = error.message;
+    report.hasAccountHeading = document.body.textContent.includes("Account security");
+    report.hasLoginHeading = document.body.textContent.includes("Welcome to LumicSec");
+    report.hasBackupButton = document.body.textContent.includes("Add backup authenticator");
   }
   document.body.dataset.fixtureResult = report.problem ? "FAIL" : "DONE";
   await fetch("/__report", {
@@ -78,9 +89,15 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
     if (url.pathname === "/auth/session") {
       return sendJson(res, 200, {
-        state: "needs_enrollment", configured: true, csrfToken: "synthetic-csrf-only",
+        state: String(req.headers.referer ?? "").includes("backup") ? "authenticated" : "needs_enrollment",
+        configured: true, csrfToken: "synthetic-csrf-only",
         user: { id: "synthetic-user", email: "synthetic@example.invalid" },
       });
+    }
+    if (url.pathname === "/auth/mfa/factors" && req.method === "GET") {
+      return sendJson(res, 200, { verifiedTotpFactors: [
+        { id: "synthetic-verified-factor", friendlyName: "Synthetic verified authenticator" },
+      ] });
     }
     if (url.pathname === "/auth/mfa/enroll" && req.method === "POST") {
       return sendJson(res, 200, {
@@ -104,6 +121,11 @@ const server = createServer(async (req, res) => {
       const safe = {
         browser: item.browser === "firefox" ? "firefox" : "chromium",
         fixture: item.fixture === "valid" ? "valid" : "broken",
+        backup: !!item.backup,
+        stage: typeof item.stage === "string" ? item.stage.slice(0, 40) : null,
+        hasAccountHeading: !!item.hasAccountHeading,
+        hasLoginHeading: !!item.hasLoginHeading,
+        hasBackupButton: !!item.hasBackupButton,
         formVisible: !!item.formVisible,
         manualKeyVisible: !!item.manualKeyVisible,
         manualInstructionsVisible: !!item.manualInstructionsVisible,
