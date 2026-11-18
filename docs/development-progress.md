@@ -97,6 +97,18 @@ Exact `main` code commit: `335766c31d20736538f91ded91b130039d78f02e`, created fr
 
 Documentation-only updates after the code commit require their own exact-SHA GitHub Actions verification; do not reuse prior run IDs as proof for newer commits.
 
+## Founder laptop active-checkout synchronization and manual MFA fallback
+
+Independent CTO inspection on 2026-11-18 identified the founder's **active** development checkout at `/home/kalyan/lumicsec` was still at `db2d7d61ff767e861367171a9f7fd38806666d6e`, despite the separate validation workspace and GitHub `main` being at `d5706429f6de5afdf70ffb7b922a3fd6bfb362a5`. The active checkout was clean, on `main`, and its origin pointed to the expected repository. It was synchronized with `git fetch origin main` and `git merge --ff-only FETCH_HEAD`, after checking that the old commit was an ancestor. No reset, re-clone, force-push, environment change or deletion was performed. It was clean at the synchronized HEAD.
+
+The original app's dev-process tree was confirmed under `/home/kalyan/lumicsec` (Vite under `apps/web`, Fastify under `apps/api`). Only the old LumicSec dev-process chain was terminated, and `pnpm dev` restarted in **the active checkout**. Both services listened on loopback: frontend `127.0.0.1:5173` and API `127.0.0.1:8787`. HTTP checks returned 200 for the frontend and `/healthz`. `/auth/session` returned `anonymous` with Supabase configured; `/v1/organizations` rejected an unauthenticated request with HTTP 401; the negative OAuth callback returned 302. The served Vite module included the committed direct QR Data URL fix.
+
+A follow-up React bug was confirmed: when the QR image failed, the manual setup key appeared but the six-digit verification form was hidden. The setup page now keeps the verification form available for **every active enrollment**, independent of QR rendering, and explains how to manually enter the time-based secret. Generating a replacement disables code submission during that request. The manual secret remains limited to the authenticated enrollment page; no real secret was printed, logged, or used in the browser tests.
+
+The controlled optional browser fixture `apps/web/tests/mfa-manual-fallback-smoke.mjs` serves the **actual built React frontend** with a self-contained synthetic API on `127.0.0.1:5187`. It never calls Supabase or the real API. Chromium and Firefox each passed two scenarios (valid synthetic SVG and deliberately broken synthetic SVG), checking the QR's load/error status, visible manual entry instructions, visible six-digit field and an attempted verification that produced a simulated failure message. **Four of four local browser scenarios passed**. This is browser/UI evidence, NOT an actual hosted Google OAuth or real authenticator success.
+
+The API OAuth/session regression suite now additionally covers Google-only OAuth initiation, callback success/error handling, AAL1/AAL2 session gating, unavailable session claims and sign-out through mocked Supabase methods. Real session revocation propagation, live factors, recovery codes, backup authenticator management, hosted PKCE and actual device re-login/expiry tests are **still unverified or unimplemented**. See `docs/security/mfa-enrollment-qualification.md`. Do not onboard production customers on this basis.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.

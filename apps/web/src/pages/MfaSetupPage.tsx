@@ -56,11 +56,12 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
               <div className="grid min-h-44 place-items-center rounded-2xl bg-white p-3">
                 {qrValid && !qrFailed
                   ? <img src={qrSource} alt="Authenticator enrollment QR code" className="h-40 w-40" onError={() => setQrFailed(true)} />
-                  : <p role="alert" className="text-center text-xs text-rose-700">QR image unavailable. Generate a fresh authenticator code below.</p>}
+                  : <p role="alert" className="text-center text-xs text-rose-700">QR image unavailable. Enter the manual setup key in your authenticator, then verify below, or generate a fresh QR.</p>}
               </div>
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Manual setup key</div>
                 <div className="mt-2 break-all rounded-xl border border-white/10 bg-slate-950 p-3 font-mono text-sm text-cyan-100">{enrollment.secret}</div>
+                <p className="mt-2 text-xs leading-5 text-slate-400">If you cannot scan the QR, choose manual entry in your authenticator app, use LumicSec as the account label, and select a time-based (TOTP) code. Enter the generated six-digit code below.</p>
                 <p className="mt-2 text-xs leading-5 text-slate-500">Keep this secret private. It is shown only during enrollment and is not written to application logs.</p>
               </div>
             </div>
@@ -72,13 +73,13 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
             </Button>
           ) : null}
 
-          {enrollment && qrValid && !qrFailed ? (
+          {enrollment ? (
             <form className="mt-7 space-y-3" onSubmit={form.handleSubmit((values) => verify.mutate(values.code))}>
               <label className="block text-sm font-medium text-slate-200" htmlFor="totp-code">Six-digit authenticator code</label>
               <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" {...form.register("code")} />
               {form.formState.errors.code ? <p className="text-xs text-rose-300">{form.formState.errors.code.message}</p> : null}
               {verify.isError ? <p role="alert" className="text-xs text-rose-300">{verify.error.message}</p> : null}
-              <Button className="w-full" type="submit" disabled={verify.isPending}>{verify.isPending ? "Verifying…" : "Verify and continue"}</Button>
+              <Button className="w-full" type="submit" disabled={verify.isPending || enroll.isPending}>{verify.isPending ? "Verifying…" : "Verify and continue"}</Button>
             </form>
           ) : null}
 

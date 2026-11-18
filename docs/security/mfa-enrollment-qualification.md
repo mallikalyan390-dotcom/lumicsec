@@ -43,3 +43,24 @@ The following require a controlled hosted environment and real user interaction,
 An enrollment QR/key already appeared in an earlier screenshot. **Do not reuse that enrollment secret.** When the founder next enters the MFA setup flow, explicitly generate a fresh factor; the normal enrollment route removes obsolete unverified LumicSec factors. If the exposed factor has already been **verified**, do **not** blindly delete it: first authenticate at AAL2 and establish a tested backup or recovery path, then perform a carefully confirmed rotation. No live factor deletion is authorized in this milestone.
 
 Do not mark the commercial authentication milestone or full SaaS as complete until the above acceptance gates pass.
+
+## Active-checkout synchronization and QR-error manual path
+
+The founder's active app folder `/home/kalyan/lumicsec` was safely fast-forwarded from `db2d7d61ff767e861367171a9f7fd38806666d6e` to the verified `main` version. The local dev frontend/API were restarted from that folder, not the earlier validation workspace. `http://127.0.0.1:5173/` and `http://127.0.0.1:8787/healthz` both returned HTTP 200; `/auth/session` was `anonymous`, not a hosted Google sign-in success.
+
+**Manual enrollment fallback fix:** In `MfaSetupPage`, the enrollment verification form is now rendered whenever an enrollment exists, even if its QR cannot load. The key can be entered manually into a time-based authenticator app; selecting a replacement factor temporarily blocks verification during rotation. This fixes the previously inaccessible manual setup path. It does not enable access without verification.
+
+**Reproducible synthetic browser fixture:** Build the frontend, then start `node apps/web/tests/mfa-manual-fallback-smoke.mjs`; it serves the actual compiled React app on loopback port 5187, replacing `/auth/session`, `/auth/mfa/enroll`, and `/auth/mfa/verify` with synthetic responses only. Visit `/?valid` for a well-formed test SVG and `/` for an intentionally broken test SVG. The page automatically exercises enrollment, the visible verification form and a simulated rejected code. Inspect the safe-result-only `/__status` endpoint. This fixture **must not be used to qualify hosted OAuth or TOTP**.
+
+Actual local browser evidence, 2026-11-18:
+
+| Browser | Test image | QR status observed | Manual instructions and code input | Rejected fixture code feedback |
+|---|---|---|---|---|
+| Chromium | Valid SVG Data URL | Image loaded | Visible | Displayed |
+| Firefox | Valid SVG Data URL | Image loaded | Visible | Displayed |
+| Chromium | Broken SVG Data URL | QR error shown | Visible | Displayed |
+| Firefox | Broken SVG Data URL | QR error shown | Visible | Displayed |
+
+A separate API regression test suite verifies Google-only OAuth callback route initiation, code exchange and failure redirects, JWT/assurance AAL1 denial, AAL2 positive branch, session failures, and sign-out **with mocks only**. Protected workspace access for unauthenticated requests was additionally denied by the actual local Fastify API (401).
+
+**Release blockers remain:** founder-assisted hosted Google login, live authenticator enrollment with a **fresh** never-exposed key, real TOTP scanning/code acceptance, current and next AAL checks, protected tenant API access with a real authenticated session, real logout/re-login, token refresh/expiry and revocation propagation, rate-limit/failed-code checks under hosted behavior, audited single-use recovery codes, and safe backup authenticator/re-enrollment management. Supabase's built-in MFA APIs do not themselves implement this application's required recovery codes; recovery cannot be described as complete without a designed private schema and tested protections. No founder factor was modified by these validations.
