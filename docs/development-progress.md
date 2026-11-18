@@ -39,6 +39,13 @@ The original source parser accepts a valid OpenAPI document containing zero oper
 
 These are **local results**, not GitHub CI green checks. Record hosted workflow run IDs and final commit SHA only after the checks pass on GitHub.
 
+## First GitHub-hosted CI evidence
+
+Commit `816c8bdf84b3599faad2a837b429fcc7f125890d`:
+- Lockfile verification: run [44313693401](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44313693401) **SUCCESS**, frozen installation and unchanged lockfile verified.
+- CI: run [44313693444](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44313693444) **FAILURE**, install and lint passed, typecheck failed with `TS2307` because workspace library `dist` files did not exist before the typecheck step.
+- Correction: add an explicit workspace-library build phase before CI TypeScript checks. This is a CI ordering correction, not a claim that the first CI run passed.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.

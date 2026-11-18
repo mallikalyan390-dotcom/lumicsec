@@ -22,6 +22,12 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Compile workspace libraries
+        run: |
+          pnpm --filter @lumicsec/shared build
+          pnpm --filter @lumicsec/validation build
+          pnpm --filter @lumicsec/api-security-engine build
+          pnpm --filter @lumicsec/web-security-engine build
       - name: Lint
         run: pnpm lint
       - name: Typecheck
