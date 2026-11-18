@@ -1,0 +1,39 @@
+name: Bootstrap pnpm lockfile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "apps/**/package.json"
+      - "packages/**/package.json"
+      - ".node-version"
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lockfile:
+    if: \${{ hashFiles('pnpm-lock.yaml') == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Generate lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Verify frozen install
+        run: pnpm install --frozen-lockfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumicsec-pnpm-lockfile
+          path: pnpm-lock.yaml
+          if-no-files-found: error
+          retention-days: 7
