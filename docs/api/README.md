@@ -13,3 +13,16 @@ Auth routes:
 - POST /auth/mfa/enroll
 - POST /auth/mfa/verify
 - POST /auth/logout
+
+## Customer organizations and pending assets
+
+These endpoints require a Google-authenticated, verified TOTP AAL2 session. Every POST requires the origin-bound CSRF token provided by GET /auth/session. Data access uses the caller's Supabase session and tenant RLS; no service-key bypass is used.
+
+- GET /v1/organizations: returns only accessible organizations and current-user memberships.
+- POST /v1/organizations with JSON {"displayName":"Acme Engineering"}: creates an organization; a private trigger creates its requester as owner atomically. Returns HTTP 201.
+- GET /v1/assets?organizationId=<uuid>: returns only RLS-authorized assets.
+- POST /v1/assets with JSON {"organizationId":"<uuid>","kind":"website","displayName":"Portal","origin":"https://example.com"}: inserts an asset using the database's fixed pending default; returns HTTP 201 and scanningEnabled:false.
+
+The origin validator requires a public-DNS-style HTTPS hostname; it rejects credentials, IP literals, paths, queries, non-default ports and local/reserved suffixes. It makes NO DNS lookup, does not prove asset ownership, does not set verification to verified, and cannot launch a scan. Browser users cannot alter verification status or insert worker jobs/findings.
+
+Hosted Google OAuth/TOTP end-to-end completion is still pending configuration and real live session tests. The endpoints are implemented and unit tested, and database RLS checks have passed transactionally, but commercial onboarding is NOT certified.

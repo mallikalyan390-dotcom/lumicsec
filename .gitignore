@@ -18,3 +18,6 @@ Thumbs.db
 *.key
 *.p12
 *.pfx
+
+# Supabase CLI connection metadata (never commit)
+supabase/.temp/

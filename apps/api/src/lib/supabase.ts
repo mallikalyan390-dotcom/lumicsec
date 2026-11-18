@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { cookieSecure, env } from "../env.js";
 
+// Supabase may rotate cookies when validating a user. setAll updates
+// request.cookies too, so a later handler sees the newest credentials.
 export function createSupabaseForRequest(request: FastifyRequest, reply: FastifyReply) {
   if (
     !env.SUPABASE_URL
@@ -25,6 +27,7 @@ export function createSupabaseForRequest(request: FastifyRequest, reply: Fastify
       },
       setAll(cookiesToSet) {
         for (const cookie of cookiesToSet) {
+          request.cookies[cookie.name] = cookie.value;
           reply.setCookie(cookie.name, cookie.value, {
             ...cookie.options,
             path: "/",

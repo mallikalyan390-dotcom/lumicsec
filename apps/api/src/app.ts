@@ -7,6 +7,7 @@ import { allowedOrigins, env } from "./env.js";
 import { isValidCsrfRequest } from "./lib/csrf.js";
 import { authRoutes } from "./routes/auth.js";
 import { apiSpecRoutes } from "./routes/api-specs.js";
+import { customerWorkspaceRoutes } from "./routes/customer-workspace.js";
 
 export function buildApp() {
   const app = Fastify({
@@ -53,6 +54,7 @@ export function buildApp() {
 
   app.register(authRoutes);
   app.register(apiSpecRoutes);
+  app.register(customerWorkspaceRoutes);
 
   app.setNotFoundHandler(async (_request, reply) => {
     return reply.code(404).send({ error: "NOT_FOUND" });

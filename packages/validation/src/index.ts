@@ -10,3 +10,21 @@ export const apiSpecAssessmentRequestSchema = z.object({
 }).strict();
 
 export type ApiSpecAssessmentRequest = z.infer<typeof apiSpecAssessmentRequestSchema>;
+
+export const organizationCreateSchema = z.object({
+  displayName: z.string().trim().min(2).max(160),
+}).strict();
+
+export const organizationIdQuerySchema = z.object({
+  organizationId: z.uuid(),
+}).strict();
+
+export const assetCreateSchema = z.object({
+  organizationId: z.uuid(),
+  kind: z.enum(["website", "api"]),
+  displayName: z.string().trim().min(2).max(160),
+  origin: z.string().trim().min(10).max(253),
+}).strict();
+
+export type OrganizationCreateRequest = z.infer<typeof organizationCreateSchema>;
+export type AssetCreateRequest = z.infer<typeof assetCreateSchema>;

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileSearch, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { FileSearch, Globe2, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
 import type { ReactNode } from "react";
 import type { AuthSessionResponse } from "@lumicsec/shared";
@@ -22,6 +22,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
   const navItems = [
     { to: "/app", label: "Overview", icon: LayoutDashboard, end: true },
     { to: "/app/api-security", label: "API Security", icon: FileSearch, end: false },
+    { to: "/app/assets", label: "Assets & organizations", icon: Globe2, end: false },
   ];
 
   return (
@@ -52,7 +53,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
         <div className="mt-8 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">In development</div>
         <div className="mt-3 space-y-2 px-2 text-xs text-slate-500">
           <div className="flex items-center justify-between"><span>Website Security</span><Badge>Later</Badge></div>
-          <div className="flex items-center justify-between"><span>Assets & ownership</span><Badge>Later</Badge></div>
+          <div className="flex items-center justify-between"><span>Ownership verification</span><Badge>Later</Badge></div>
           <div className="flex items-center justify-between"><span>Findings & reports</span><Badge>Later</Badge></div>
           <div className="flex items-center justify-between"><span>Monitoring</span><Badge>Later</Badge></div>
         </div>
@@ -73,6 +74,11 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
             </Button>
           </div>
         </header>
+        <nav className="flex flex-wrap gap-2 border-b border-white/10 px-5 py-3 text-xs lg:hidden" aria-label="Workspace navigation">
+          <NavLink to="/app" end className="rounded-lg border border-white/10 px-3 py-2">Overview</NavLink>
+          <NavLink to="/app/api-security" className="rounded-lg border border-white/10 px-3 py-2">API Security</NavLink>
+          <NavLink to="/app/assets" className="rounded-lg border border-white/10 px-3 py-2">Assets</NavLink>
+        </nav>
         <main className="mx-auto max-w-7xl p-5 sm:p-8">{children}</main>
       </div>
     </div>

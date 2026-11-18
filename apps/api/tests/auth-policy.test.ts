@@ -16,6 +16,12 @@ describe("Google-only AAL2 policy", () => {
     })).toBe(false);
   });
 
+  it("does not confuse a linked Google identity with a Google-first-factor account", () => {
+    expect(isGoogleIdentity({
+      app_metadata: { provider: "email", providers: ["email", "google"] },
+    })).toBe(false);
+  });
+
   it("requires Google identity, AAL2 and OAuth plus TOTP methods", () => {
     const user = { app_metadata: { provider: "google", providers: ["google"] } };
     const claims = { aal: "aal2", amr: [{ method: "oauth" }, { method: "totp" }] };

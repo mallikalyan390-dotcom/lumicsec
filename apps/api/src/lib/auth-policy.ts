@@ -26,8 +26,9 @@ function authenticationMethods(claims: unknown): string[] {
 
 export function isGoogleIdentity(user: UserLike): boolean {
   const metadata = record(user.app_metadata);
-  const providers = Array.isArray(metadata["providers"]) ? metadata["providers"] : [];
-  return metadata["provider"] === "google" || providers.includes("google");
+  // A linked Google identity does NOT prove the current account's primary
+  // login provider was Google. Fail closed until hosted OAuth E2E qualifies it.
+  return metadata["provider"] === "google";
 }
 
 export function isGoogleAal2(

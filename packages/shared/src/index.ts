@@ -59,3 +59,35 @@ export interface ApiHealthResponse {
   service: "lumicsec-api";
   version: string;
 }
+
+export interface CustomerOrganization {
+  id: string;
+  display_name: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CustomerMembership {
+  organization_id: string;
+  member_role: "owner" | "admin" | "analyst" | "viewer";
+  member_status: "active" | "suspended";
+}
+
+export interface CustomerAsset {
+  id: string;
+  organization_id: string;
+  asset_kind: "website" | "api";
+  display_name: string;
+  canonical_origin: string;
+  verification_status: "pending" | "verified" | "revoked";
+  created_at: string;
+}
+
+export interface CustomerOrganizationsResponse {
+  organizations: CustomerOrganization[];
+  memberships: CustomerMembership[];
+}
+
+export interface CustomerAssetsResponse {
+  assets: CustomerAsset[];
+}

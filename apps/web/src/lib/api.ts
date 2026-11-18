@@ -1,4 +1,9 @@
-import type { ApiHealthResponse, AuthSessionResponse } from "@lumicsec/shared";
+import type {
+  ApiHealthResponse,
+  AuthSessionResponse,
+  CustomerAssetsResponse,
+  CustomerOrganizationsResponse,
+} from "@lumicsec/shared";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -46,4 +51,14 @@ export function postJson<T>(path: string, body: unknown, csrfToken: string) {
     },
     body: JSON.stringify(body),
   });
+}
+
+export function getOrganizations() {
+  return requestJson<CustomerOrganizationsResponse>("/v1/organizations");
+}
+
+export function getAssets(organizationId: string) {
+  return requestJson<CustomerAssetsResponse>(
+    "/v1/assets?organizationId=" + encodeURIComponent(organizationId),
+  );
 }

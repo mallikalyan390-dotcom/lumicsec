@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getAuthSession, postJson } from "../src/lib/api.js";
+import { getAssets, getAuthSession, getOrganizations, postJson } from "../src/lib/api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -39,6 +39,33 @@ describe("browser API client", () => {
     expect(options.method).toBe("POST");
     expect(options.body).toBe('{"name":"check"}');
     expect(new Headers(options.headers).get("x-csrf-token")).toBe("csrf");
+  });
+
+  it("requests tenant-scoped asset lists with credentials", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"assets":[]}', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect((await getAssets("00000000-0000-4000-8000-000000000001")).assets).toEqual([]);
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("organizationId=00000000-0000-4000-8000-000000000001");
+    expect(options.credentials).toBe("include");
+  });
+
+  it("lists organizations only using a credentialed request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      '{"organizations":[],"memberships":[]}',
+      { status: 200, headers: { "content-type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect((await getOrganizations()).organizations).toEqual([]);
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/v1/organizations");
+    expect(options.cache).toBe("no-store");
+    expect(options.credentials).toBe("include");
   });
 
   it("does not treat rejected protected calls as successful", async () => {

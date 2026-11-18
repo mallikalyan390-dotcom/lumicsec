@@ -9,11 +9,12 @@ LumicSec is being built as a multi-tenant security SaaS for authorized websites 
 - React + TypeScript + Vite customer application.
 - Fastify + TypeScript API with Google OAuth PKCE and mandatory TOTP flow scaffolding.
 - Supabase Auth cookie-backed sessions; no browser password, email OTP, SMS or alternative social-login UI.
+- Development Supabase organization/asset schema with tenant RLS; protected customer organization and pending asset entrypoints and dashboard view.
 - Offline OpenAPI / Swagger specification inventory and deterministic API observations.
 - Bounded passive Web assessment discovery and response-analysis primitives.
 - Source-engine provenance, qualification notes and security gates.
 
-The API specification assessment is **SPEC_ONLY**. It does not send requests to the customer's API, verify runtime authorization, or prove exploitability. Website network scanning remains disabled until ownership verification and the complete SSRF-safe transport are integrated and tested.
+The API specification assessment is **SPEC_ONLY**. It does not send requests to the customer's API, verify runtime authorization, or prove exploitability. All registered customer assets stay PENDING, and website network scanning remains disabled until ownership verification and the complete SSRF-safe transport are integrated and tested.
 
 ## Stack
 

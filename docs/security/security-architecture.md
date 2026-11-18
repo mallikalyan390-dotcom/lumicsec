@@ -17,11 +17,14 @@
 - Organization membership and role checks belong in database policies / server-controlled tables.
 - Protected database operations must use the user's JWT so RLS is evaluated.
 - Service/secret keys are server-only and reserved for narrow worker operations.
-- Cross-tenant IDOR/BOLA tests are mandatory before customer data features are accepted.
+- Development migration 20261118133942_tenant_rls_foundation.sql enables RLS on six public tables; no anonymous table SELECT privileges, no browser write access to memberships, verification status, jobs, observations or audit events.
+- A private, non-exposed SECURITY DEFINER trigger atomically creates an owner membership and checks session identity; EXECUTE is revoked for anon/authenticated.
+- A two-user PostgreSQL transaction test (supabase/tests/tenant-isolation.sql) passed against the lumicsec-local project: permitted owner reads, cross-tenant reads/writes denied, AAL1 and non-Google creation denied; ROLLBACK persisted no test users.
+- This does not yet prove hosted browser-session behavior, live OAuth/MFA or session revocation. End-to-end cross-tenant IDOR/BOLA tests remain a release gate.
 
 ## Scanner safety
 
-No live scan is enabled by the initial commit.
+No live scan is enabled. The customer workspace can register assets only in a pending state; no live transport, DNS verification, ownership authorization, job enqueueing or scanner execution is wired.
 
 Before a worker can read a customer asset, it must verify ownership, compile exact origin and path scope, resolve DNS, reject every private / loopback / link-local / multicast / metadata address, pin the resolved public IP, revalidate every redirect, enforce HTTPS and safe methods, cap ports, requests, response bytes, concurrency and deadlines, and record the authorization and evidence chain.
 
