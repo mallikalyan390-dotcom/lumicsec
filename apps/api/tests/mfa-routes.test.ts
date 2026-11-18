@@ -33,7 +33,7 @@ function client() {
           data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null,
         }),
         enroll: vi.fn().mockResolvedValue({
-          data: { id: "new-pending", totp: { qr_code: qr, secret: "FIXTURE_ONLY" } },
+          data: { id: "new-pending", totp: { qr_code: qr, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" } },
           error: null,
         }),
         unenroll: vi.fn().mockResolvedValue({ data: {}, error: null }),
@@ -71,7 +71,7 @@ describe("Google TOTP MFA API regression", () => {
     const instance = await app();
     const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
     expect(result.statusCode).toBe(200);
-    expect(result.json().qrCodeSvg).toBe(qr);
+    expect(result.json().qrCodeSvg).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
     expect(result.headers["cache-control"]).toBe("no-store");
     expect(String(result.headers["set-cookie"])).toContain("lumicsec_pending_totp=new-pending");
     expect(supabase.auth.mfa.unenroll).toHaveBeenCalledExactlyOnceWith({ factorId: "pending" });
@@ -99,16 +99,117 @@ describe("Google TOTP MFA API regression", () => {
     expect(supabase.auth.mfa.enroll).not.toHaveBeenCalled();
   });
 
-  it("rejects an unsafe QR URL and attempts cleanup of just-created factor", async () => {
+  it("continues the same pending enrollment with manual key for an unsafe QR", async () => {
     supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
     supabase.auth.mfa.enroll.mockResolvedValue({
-      data: { id: "new-pending", totp: { qr_code: "data:text/html,<svg></svg>", secret: "FIXTURE_ONLY" } },
+      data: { id: "new-pending", totp: { qr_code: "data:text/html,<svg></svg>", secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" } },
       error: null,
     });
     const instance = await app();
     const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
-    expect(result.statusCode).toBe(502);
-    expect(supabase.auth.mfa.unenroll).toHaveBeenCalledExactlyOnceWith({ factorId: "new-pending" });
+    expect(result.statusCode).toBe(200);
+    expect(result.json()).toEqual({
+      qrCodeSvg: null, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY",
+    });
+    expect(result.headers["cache-control"]).toBe("no-store");
+    expect(String(result.headers["set-cookie"])).toContain("lumicsec_pending_totp=new-pending");
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("accepts a multiline XML-prefixed SVG in the real enrollment route", async () => {
+    const multiline = 'data:image/svg+xml;utf-8,<?xml version="1.0"?>\n'
+      + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90">\n'
+      + '<path d="M0 0 h20 v20 H0 z" fill="#000"/>\n</svg>';
+    supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: { id: "new-pending", totp: { qr_code: multiline, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" } }, error: null,
+    });
+    const instance = await app();
+    const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(result.statusCode).toBe(200);
+    expect(result.json().qrCodeSvg?.startsWith("data:image/svg+xml;charset=utf-8,")).toBe(true);
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("continues enrollment with manual key when Supabase QR is missing", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: { id: "new-pending", totp: { qr_code: null, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" } },
+      error: null,
+    });
+    const instance = await app();
+    const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(result.statusCode).toBe(200);
+    expect(result.json().qrCodeSvg).toBeNull();
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("rejects unusable enrollment secrets without exposing a TOTP factor", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: { id: "new-pending", totp: { qr_code: qr, secret: "" } },
+      error: null,
+    });
+    const instance = await app();
+    const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(result.statusCode).toBe(400);
+    expect(result.json()).toEqual({ error: "TOTP_ENROLLMENT_FAILED" });
+    expect(String(result.headers["set-cookie"] ?? "")).not.toContain("new-pending");
+  });
+
+  it("completes manual fallback enrollment, challenge and AAL2 in one controlled flow", async () => {
+    supabase.auth.mfa.listFactors
+      .mockResolvedValueOnce({ data: { all: [], totp: [] }, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          all: [{
+            id: "new-pending", status: "unverified", factor_type: "totp",
+            friendly_name: "LumicSec Authenticator test-only",
+          }],
+          totp: [],
+        },
+        error: null,
+      });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: {
+        id: "new-pending",
+        totp: { qr_code: "data:text/html,unsafe-qr", secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" },
+      },
+      error: null,
+    });
+    const instance = await app();
+    const setup = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(setup.statusCode).toBe(200);
+    expect(setup.json().qrCodeSvg).toBeNull();
+    const verification = await instance.inject({
+      method: "POST", url: "/auth/mfa/verify",
+      headers: { cookie: "lumicsec_pending_totp=new-pending" }, payload: { code: "123456" },
+    });
+    expect(verification.statusCode).toBe(200);
+    expect(verification.json()).toEqual({ verified: true, assuranceLevel: "aal2" });
+    expect(supabase.auth.mfa.challenge).toHaveBeenCalledWith({ factorId: "new-pending" });
+    expect(supabase.auth.mfa.verify).toHaveBeenCalledWith({
+      factorId: "new-pending", challengeId: "challenge", code: "123456",
+    });
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("preserves an existing verified factor even if a new backup QR is unusable", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({
+      data: { all: [verified], totp: [verified] }, error: null,
+    });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: {
+        id: "new-pending",
+        totp: { qr_code: "data:text/html,unsupported", secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY" },
+      },
+      error: null,
+    });
+    const instance = await app();
+    const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(result.statusCode).toBe(200);
+    expect(result.json().qrCodeSvg).toBeNull();
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
   });
 
   it("verifies first-time enrollment via all[] and confirms AAL2", async () => {

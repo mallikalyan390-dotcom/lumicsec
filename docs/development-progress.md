@@ -122,6 +122,18 @@ Exact `main` code commit `ce4c5dc5d7b3261f1a0f11fbfd0a59865e24529a`. The GitHub 
 
 The custom single-use recovery-code scheme, AAL2-protected backup authenticator management, verified-factor rotation and session revocation propagation remain **required but incomplete**. The previously exposed QR secret must never be reused. No database migrations, live factor changes, production deployments or paid services occurred in this checkpoint. This exact code SHA has hosted CI evidence; any later docs-only commit needs fresh checks.
 
+## P0 Supabase TOTP QR false-rejection hardening
+
+On 2026-11-18, a founder-reproduced error `TOTP_QR_FORMAT_UNSUPPORTED` was investigated at `/auth/mfa/enroll`. The installed `@supabase/auth-js@2.119.0` source (`GoTrueClient.ts`, `mfa.enroll`) confirms the SDK attaches `data:image/svg+xml;utf-8,` to the provider's raw SVG; it does **not** strip or URI-encode XML whitespace/newlines. The previous validator rejected all raw newlines and only recognized an SVG tag at the very beginning. This was a confirmed false-negative defect. **The exact payload of the founder's hosted enrollment was not collected and remains unverified.**
+
+The validator now handles raw multiline/CRLF SVG, supported XML declarations with whitespace, URI-encoded SVG, and base64 SVG, under strict bounds. An intentionally conservative SVG drawing-element/attribute allowlist rejects scripts, events, external links, CSS, foreignObject, DTD, entities, CDATA, invalid nesting, and oversized/malformed data. Accepted images become canonical percent-encoded SVG Data URLs; unsafe SVG is never sent to the browser.
+
+**Manual availability fallback:** After Google identity checks, a Supabase enrollment with a valid factor ID and manual TOTP key can proceed when its QR is absent/unsafe. The API returns `qrCodeSvg: null`, the same enrollment's key, and the pending-factor HTTP-only cookie with `Cache-Control: no-store`. Only categorical format metadata is logged—no SVG, factor ID, secret, OTP URI, token, cookie, or user ID. The frontend retains manual key and six-digit form; Supabase challenge/verification and AAL2 are still mandatory. Missing/invalid secrets fail closed. **QR rejection no longer deletes the new or any verified factor.** Explicit replacement of app-owned abandoned *unverified* factors remains separate.
+
+Synthetic validator and API route tests cover safe/unsafe SVG, malformed QR manual flow, pending factor selection, failed codes and protected Google+AAL2 gates. The actual compiled Fastify backend is additionally exercised on a separate loopback port beside the compiled React synthetic-browser fixture; no real MFA secrets or hosted factors are used.
+
+**Remaining release blockers:** founder-driven hosted Google callback, actual provider QR shape, real authenticator scan/manual code, AAL2 session, customer API access, expiration/revocation, recovery codes and backup factor management. Production/deployment/MFA settings and databases were not modified.
+
 ## Known security advisory
 
 The full (including dev tooling) audit reports **GHSA-fc5q-39xc-vjpf (CVE-2026-112366)** in `picomatch <= 4.0.7`. The registry advisory reports no patched version as of 2026-11-18. Production-only audit is clean. This advisory remains unresolved and must be tracked; do not claim all dependencies are vulnerability-free. See `docs/security/dependency-advisories.md`.

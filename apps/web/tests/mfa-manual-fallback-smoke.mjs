@@ -11,8 +11,12 @@ const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../dist");
 const port = 5187;
 const results = [];
 let submissions = 0;
-const qrBroken = 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg"><path';
-const qrWorking = 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" fill="white"/></svg>';
+// These are synthetic browser-only fixtures; never live MFA keys or URLs.
+const qrBroken = null; // API now falls back to manual enrollment for rejected SVG.
+const qrWorking = 'data:image/svg+xml;utf-8,<?xml version="1.0"?>\n'
+  + '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">\n'
+  + '<rect width="180" height="180" fill="white"/>\n'
+  + '<path d="M0 0 h40 v40 H0 z" fill="black"/>\n</svg>';
 
 const browserHarness = `<script>
 (async function browserSmoke() {

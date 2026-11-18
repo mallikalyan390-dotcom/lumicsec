@@ -72,3 +72,13 @@ A read-only inspection of the active local API's `/auth/google` route showed an 
 This establishes that the Google authorization **handoff** is configured, not that consent, callback code exchange, browser cookie policy, token refresh, authenticator challenge or AAL2 work against the hosted provider. The latter require founder-assisted interactive tests and must remain release blockers.
 
 Code checkpoint `ce4c5dc5d7b3261f1a0f11fbfd0a59865e24529a` passed GitHub [CI 44338785713](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785713) and [lockfile verification 44338785783](https://github.com/mallikalyan390-dotcom/lumicsec/actions/runs/44338785783).
+
+## P0 QR false-negative and manual enrollment continuity
+
+The founder reproduced `TOTP_QR_FORMAT_UNSUPPORTED`. The initial validator's rejection of raw newline and XML-prefixed SVG was an independently reproducible code defect, but the exact hosted QR payload remains **unknown** without founder authentication. Installed `@supabase/auth-js@2.119.0` prepends `data:image/svg+xml;utf-8,` to the raw provider SVG.
+
+A size-bounded parser now accepts supported raw, multiline, XML-prefixed, URI-encoded and Base64 SVG Data URLs while strictly allowlisting drawing elements/attributes. Unsafe scripts, events, style, external refs, DTD/entities, CDATA, invalid nesting and excess input are rejected. Accepted SVG is canonicalized before display. Unknown SVG is not rendered, but it **does not invalidate an otherwise authorized TOTP enrollment**.
+
+When a QR is unsafe or missing but the verified Google user's new pending factor ID and TOTP manual secret are available, the API returns `qrCodeSvg: null` plus that secret and the same pending-factor HTTP-only cookie. The existing manual-key UI and six-digit challenge remain functional. The API does not delete verified factors on QR failure. Only safe categorical QR metadata may be logged.
+
+Unit, mocked Fastify, and synthetic Chromium/Firefox tests do not constitute live hosted MFA qualification. A fresh real authenticator, OAuth callback, verified AAL2/session behavior, expiry/revocation, recovery codes and safe backup management remain release blockers. No actual factor was changed by automated tests.

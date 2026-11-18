@@ -12,7 +12,7 @@ import { Card, CardContent } from "../components/ui/Card.js";
 import { Input } from "../components/ui/Input.js";
 
 const formSchema = z.object({ code: mfaCodeSchema });
-type Enrollment = { qrCodeSvg: string; secret: string };
+type Enrollment = { qrCodeSvg: string | null; secret: string };
 
 export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);

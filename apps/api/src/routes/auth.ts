@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { isTrustedTotpQrImageDataUrl, mfaCodeSchema } from "@lumicsec/validation";
+import { mfaCodeSchema, normalizeTotpSvgQrDataUrl, totpQrFormatMetadata } from "@lumicsec/validation";
 import { cookieSecure, env } from "../env.js";
 import { ensureCsrfToken } from "../lib/csrf.js";
 import { isGoogleIdentity, isGoogleAal2 } from "../lib/auth-policy.js";
@@ -162,24 +162,26 @@ export async function authRoutes(app: FastifyInstance) {
       friendlyName,
     });
 
-    if (error || !data?.totp?.qr_code || !data.totp.secret) {
+    // The secret + factor ID, not the SVG, are required for enrollment. If a
+    // provider changes its QR format, keep the same unverified factor and let
+    // the user enroll through manual TOTP entry. Never delete verified factors.
+    if (error || !data?.id || typeof data.totp?.secret !== "string"
+      || data.totp.secret.length < 16 || data.totp.secret.length > 256) {
       request.log.warn({ errorCode: error?.code }, "TOTP enrollment failed");
       return reply.code(400).send({ error: "TOTP_ENROLLMENT_FAILED" });
     }
 
-    if (!isTrustedTotpQrImageDataUrl(data.totp.qr_code)) {
-      // Do not return an invalid or potentially unsafe image URL to the browser.
-      // Remove only the factor we just created; keep every verified factor.
-      const { error: cleanupError } = await supabase.auth.mfa.unenroll({ factorId: data.id });
-      if (cleanupError) {
-        request.log.warn({ errorCode: cleanupError.code }, "Invalid QR enrollment cleanup failed");
-      }
-      return reply.code(502).send({ error: "TOTP_QR_FORMAT_UNSUPPORTED" });
+    const qrCodeSvg = normalizeTotpSvgQrDataUrl(data.totp.qr_code);
+    if (!qrCodeSvg) {
+      // Strictly categorical diagnostics: no SVG, OTP URI, factor ID, secret,
+      // cookies, tokens, or user identifier is ever included in logs.
+      request.log.warn({ qrFormat: totpQrFormatMetadata(data.totp.qr_code) },
+        "Supabase QR not suitable for safe display; manual TOTP enrollment remains available");
     }
 
     setPendingFactorCookie(reply, data.id);
     reply.header("cache-control", "no-store");
-    return { qrCodeSvg: data.totp.qr_code, secret: data.totp.secret };
+    return { qrCodeSvg, secret: data.totp.secret };
   });
 
   app.post<{ Body: { code?: string } }>("/auth/mfa/verify", {
