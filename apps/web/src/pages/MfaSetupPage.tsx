@@ -5,14 +5,14 @@ import { KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { AuthSessionResponse } from "@lumicsec/shared";
-import { isTrustedTotpQrImageDataUrl, mfaCodeSchema } from "@lumicsec/validation";
+import { isTrustedTotpPngDataUrl, isTrustedTotpQrImageDataUrl, mfaCodeSchema } from "@lumicsec/validation";
 import { postJson } from "../lib/api.js";
 import { Button } from "../components/ui/Button.js";
 import { Card, CardContent } from "../components/ui/Card.js";
 import { Input } from "../components/ui/Input.js";
 
 const formSchema = z.object({ code: mfaCodeSchema });
-type Enrollment = { qrCodeSvg: string | null; secret: string };
+type Enrollment = { qrCodePng?: string | null; qrCodeSvg: string | null; secret: string };
 
 export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
@@ -37,8 +37,12 @@ export function MfaSetupPage({ session }: { session: AuthSessionResponse }) {
     defaultValues: { code: "" },
   });
 
-  const qrSource = enrollment?.qrCodeSvg ?? "";
-  const qrValid = isTrustedTotpQrImageDataUrl(qrSource);
+  // Prefer locally generated PNG: no Supabase SVG dependency in the browser.
+  // Retain the hardened SVG path as a compatibility fallback only.
+  const pngSource = enrollment?.qrCodePng ?? "";
+  const svgSource = enrollment?.qrCodeSvg ?? "";
+  const qrSource = isTrustedTotpPngDataUrl(pngSource) ? pngSource : svgSource;
+  const qrValid = isTrustedTotpPngDataUrl(qrSource) || isTrustedTotpQrImageDataUrl(qrSource);
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#080d19] px-5 py-10 text-slate-100">

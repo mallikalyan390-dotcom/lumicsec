@@ -99,6 +99,21 @@ describe("Google TOTP MFA API regression", () => {
     expect(supabase.auth.mfa.enroll).not.toHaveBeenCalled();
   });
 
+  it("renders a PNG from a synthetic TOTP secret even when provider SVG is rejected", async () => {
+    supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
+    supabase.auth.mfa.enroll.mockResolvedValue({
+      data: { id: "new-pending", totp: { qr_code: "INVALID_SVG_FIXTURE", secret: "JBSWY3DPEHPK3PXP" } },
+      error: null,
+    });
+    const instance = await app();
+    const response = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().qrCodeSvg).toBeNull();
+    expect(response.json().qrCodePng).toMatch(/^data:image\/png;base64,/);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(supabase.auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
   it("continues the same pending enrollment with manual key for an unsafe QR", async () => {
     supabase.auth.mfa.listFactors.mockResolvedValue({ data: { all: [], totp: [] }, error: null });
     supabase.auth.mfa.enroll.mockResolvedValue({
@@ -109,7 +124,7 @@ describe("Google TOTP MFA API regression", () => {
     const result = await instance.inject({ method: "POST", url: "/auth/mfa/enroll", payload: {} });
     expect(result.statusCode).toBe(200);
     expect(result.json()).toEqual({
-      qrCodeSvg: null, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY",
+      qrCodePng: null, qrCodeSvg: null, secret: "SYNTHETIC_TEST_ONLY_BASE32_KEY",
     });
     expect(result.headers["cache-control"]).toBe("no-store");
     expect(String(result.headers["set-cookie"])).toContain("lumicsec_pending_totp=new-pending");

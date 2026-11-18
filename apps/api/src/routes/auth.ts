@@ -5,6 +5,7 @@ import { cookieSecure, env } from "../env.js";
 import { ensureCsrfToken } from "../lib/csrf.js";
 import { isGoogleIdentity, isGoogleAal2 } from "../lib/auth-policy.js";
 import { managedUnverifiedTotp, selectTotpChallengeFactor } from "../lib/mfa-factors.js";
+import { createTotpQrPngDataUrl } from "../lib/totp-qr-image.js";
 import { clearLumicSecCookie, createSupabaseForRequest } from "../lib/supabase.js";
 
 function setPendingFactorCookie(reply: FastifyReply, factorId: string) {
@@ -179,9 +180,16 @@ export async function authRoutes(app: FastifyInstance) {
         "Supabase QR not suitable for safe display; manual TOTP enrollment remains available");
     }
 
+    // Render a standard 256px PNG locally from this SAME pending factor's
+    // secret. Supabase SVG layout differences no longer determine QR success.
+    const qrCodePng = await createTotpQrPngDataUrl(data.totp.secret, userData.user.email);
+    if (!qrCodePng) {
+      request.log.warn("Local TOTP PNG encoding unavailable; manual entry remains available");
+    }
+
     setPendingFactorCookie(reply, data.id);
     reply.header("cache-control", "no-store");
-    return { qrCodeSvg, secret: data.totp.secret };
+    return { qrCodePng, qrCodeSvg, secret: data.totp.secret };
   });
 
   app.post<{ Body: { code?: string } }>("/auth/mfa/verify", {

@@ -4,7 +4,10 @@ export const MAX_SPEC_BYTES = 1_048_576;
 
 export const mfaCodeSchema = z.string().regex(/^[0-9]{6}$/, "Enter the six-digit authenticator code.");
 
-export { isTrustedTotpQrImageDataUrl, normalizeTotpSvgQrDataUrl, totpQrFormatMetadata } from "./totp-qr.js";
+export {
+  isTrustedTotpQrImageDataUrl, isTrustedTotpPngDataUrl,
+  normalizeTotpSvgQrDataUrl, totpQrFormatMetadata,
+} from "./totp-qr.js";
 
 export const apiSpecAssessmentRequestSchema = z.object({
   content: z.string().min(1, "Specification content is required."),
