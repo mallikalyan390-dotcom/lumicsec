@@ -51,13 +51,17 @@ export function fixtureOrigin(profile:ControlledProfile){
 export async function openControlledRuntimeBroker(input:Readonly<{
   executionId:string; origin:string; profile:ControlledProfile; signal:AbortSignal;
   maxRequests?:number;
+  /** Only the test-only broker container may mount this fixed AF_UNIX path. */
+  socketDirectory?:"/opt/lumicsec-broker";
+  onStatistics?:(stats:Readonly<{requests:number;bytes:number;failures:number;
+    active:number;externalRequests:0;profile:ControlledProfile}>)=>void;
 }>) {
   const origin=fixtureOrigin(input.profile);
   if(input.origin!==origin||!z.string().uuid().safeParse(input.executionId).success||
     input.signal.aborted)throw Error("BROKER_TEST_SCOPE_DENIED");
   const directory=await mkdtemp(join(tmpdir(),"lumicsec-controlled-broker-"));
-  const socketDirectory=join(directory,"broker-only");
-  await mkdir(socketDirectory,{mode:0o755});
+  const socketDirectory=input.socketDirectory??join(directory,"broker-only");
+  if(!input.socketDirectory)await mkdir(socketDirectory,{mode:0o755});
   const socketPath=join(socketDirectory,"request.sock");
   let tls:TlsServer|null=null;
   let unix:UnixServer|null=null;
@@ -205,6 +209,8 @@ export async function openControlledRuntimeBroker(input:Readonly<{
         }).catch(()=>reject()).finally(()=>{
           active--;aborters.delete(ac);
           input.signal.removeEventListener("abort",abort);
+          input.onStatistics?.({requests:used,bytes,failures:failure,active,
+            externalRequests:0,profile:input.profile});
         });
       });
       socket.on("close",()=>sockets.delete(socket));
@@ -213,8 +219,8 @@ export async function openControlledRuntimeBroker(input:Readonly<{
     await new Promise<void>((ok,bad)=>{
       unix!.once("error",bad);unix!.listen(socketPath,()=>{unix!.off("error",bad);ok();});
     });
-    await chmod(socketPath,0o666);
-    await chmod(socketDirectory,0o755);
+    await chmod(socketPath,input.socketDirectory?0o600:0o666);
+    if(!input.socketDirectory)await chmod(socketDirectory,0o755);
     return {
       socketDirectory,
       stats:()=>Object.freeze({requests:used,bytes,failures:failure,active,

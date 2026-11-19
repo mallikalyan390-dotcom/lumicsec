@@ -5,11 +5,12 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
-import { extname } from "node:path";
+import { extname,dirname,join } from "node:path";
 import { controlledStartSchema, parseControlledResult,
   CONTROLLED_RUNTIME_VERSION, type ControlledResult } from "./controlled-runtime-contract.js";
 import { openControlledRuntimeBroker, fixtureOrigin,
   type ControlledProfile } from "./controlled-runtime-broker.js";
+import { openConfinedRuntimeBroker } from "./confined-runtime-broker-controller.js";
 import { WEB_IPC_VERSION, parseWebIpcResult,
   type WebIpcStart, type WebIpcResult } from "./web-worker-ipc-contract.js";
 
@@ -23,7 +24,10 @@ const boundedEnvironment={PATH:process.env["PATH"]??"/usr/bin:/bin",HOME:"/tmp"}
 export async function runControlledRuntimeFixture(input:Readonly<{
   scope:Scope;mode:"web"|"api";profile:ControlledProfile;
   bundlePath:string;signal:AbortSignal;onReady?:()=>void;
-}>):Promise<Readonly<{result:ControlledResult;requests:number;bytes:number;externalRequests:0}>>{
+  brokerIsolation?:"host_fixture"|"confined_fixture";
+  onBrokerReady?:(containerName:string)=>void;
+}>):Promise<Readonly<{result:ControlledResult;requests:number;bytes:number;
+  externalRequests:0;brokerNetworkMode:"host"|"none"}>>{
   if(active.has(input.scope.jobId)||active.size>=2||input.signal.aborted ||
     (input.mode==="web")!==(input.profile.startsWith("web_"))||
     input.scope.origin!==fixtureOrigin(input.profile))
@@ -32,7 +36,8 @@ export async function runControlledRuntimeFixture(input:Readonly<{
   const controller=new AbortController();
   const onAbort=()=>controller.abort();
   input.signal.addEventListener("abort",onAbort,{once:true});
-  let broker:Awaited<ReturnType<typeof openControlledRuntimeBroker>>|null=null;
+  let broker:Awaited<ReturnType<typeof openControlledRuntimeBroker>>|
+    Awaited<ReturnType<typeof openConfinedRuntimeBroker>>|null=null;
   let deadline:ReturnType<typeof setTimeout>|null=null;
   try{
     const bundle=await realpath(input.bundlePath);
@@ -43,10 +48,18 @@ export async function runControlledRuntimeFixture(input:Readonly<{
       protocol:CONTROLLED_RUNTIME_VERSION,type:"START",
       executionId:randomUUID(),mode:input.mode,scope:input.scope,
     });
-    broker=await openControlledRuntimeBroker({
-      executionId:start.executionId,origin:input.scope.origin,
-      profile:input.profile,signal:controller.signal,
-    });
+    broker=input.brokerIsolation==="confined_fixture"
+      ?await openConfinedRuntimeBroker({
+        executionId:start.executionId,origin:input.scope.origin,
+        profile:input.profile,signal:controller.signal,
+        bundlePath:join(dirname(bundle),"confined-broker.mjs"),
+      })
+      :await openControlledRuntimeBroker({
+        executionId:start.executionId,origin:input.scope.origin,
+        profile:input.profile,signal:controller.signal,
+      });
+    if("containerName" in broker && typeof broker.containerName==="string")
+      input.onBrokerReady?.(broker.containerName);
     if(controller.signal.aborted)throw Error("CONTROLLED_RUNTIME_CANCELLED");
     const socketDir=await realpath(broker.socketDirectory);
     if(controller.signal.aborted)throw Error("CONTROLLED_RUNTIME_CANCELLED");
@@ -104,10 +117,15 @@ export async function runControlledRuntimeFixture(input:Readonly<{
     });
     const result=parseControlledResult(output,start);
     if(controller.signal.aborted)throw Error("CONTROLLED_RUNTIME_CANCELLED");
-    const counters=broker.stats();
+    const counters="networkMode" in broker
+      ?await (broker as Awaited<ReturnType<typeof openConfinedRuntimeBroker>>)
+        .awaitAccounting(result.report.requests)
+      :broker.stats();
     if(counters.requests<1||counters.bytes>240_000||counters.externalRequests!==0)
       throw Error("CONTROLLED_BROKER_ACCOUNTING_DENIED");
-    return {result,requests:counters.requests,bytes:counters.bytes,externalRequests:0};
+    return {result,requests:counters.requests,bytes:counters.bytes,
+      externalRequests:0,
+      brokerNetworkMode:"networkMode" in broker?"none":"host"};
   }finally{
     if(deadline)clearTimeout(deadline);
     controller.abort();
@@ -116,14 +134,15 @@ export async function runControlledRuntimeFixture(input:Readonly<{
     active.delete(input.scope.jobId);
   }
 }
-export function controlledWebFixtureRunner(bundlePath:string,profile:ControlledProfile){
+export function controlledWebFixtureRunner(bundlePath:string,profile:ControlledProfile,
+  brokerIsolation:"host_fixture"|"confined_fixture"="host_fixture"){
   if(!profile.startsWith("web_"))throw Error("WEB_PROFILE_REQUIRED");
   return async(input:Readonly<{request:WebIpcStart;bundlePath:string;signal:AbortSignal}>):Promise<WebIpcResult>=>{
     if(input.request.fixture!=="none"||input.bundlePath!==bundlePath)
       throw Error("WEB_CONTROLLED_INPUT_DENIED");
     const executed=await runControlledRuntimeFixture({
       mode:"web",profile,scope:input.request.scope,
-      bundlePath,signal:input.signal,
+      bundlePath,signal:input.signal,brokerIsolation,
     });
     return parseWebIpcResult(JSON.stringify({
       protocol:WEB_IPC_VERSION,type:"RESULT",

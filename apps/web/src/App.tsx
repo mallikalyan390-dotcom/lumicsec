@@ -4,6 +4,7 @@ import { AuthGate } from "./components/AuthGate.js";
 import { ApiSecurityPage } from "./pages/ApiSecurityPage.js";
 import { WebSecurityPage } from "./pages/WebSecurityPage.js";
 import { FindingsPage } from "./pages/FindingsPage.js";
+import { AssessmentPlansPage } from "./pages/AssessmentPlansPage.js";
 import { OverviewPage } from "./pages/OverviewPage.js";
 import { AssetsPage } from "./pages/AssetsPage.js";
 import { AccountSecurityPage } from "./pages/AccountSecurityPage.js";
@@ -29,6 +30,7 @@ export function App() {
           <Route path="/app/api-security" element={<AuthGate><ApiSecurityPage /></AuthGate>} />
           <Route path="/app/web-security" element={<AuthGate><WebSecurityPage /></AuthGate>} />
           <Route path="/app/findings" element={<AuthGate><FindingsPage /></AuthGate>} />
+          <Route path="/app/assessment-plans" element={<AuthGate><AssessmentPlansPage /></AuthGate>} />
           <Route path="/app/assets" element={<AuthGate><AssetsPage /></AuthGate>} />
           <Route path="/app/organizations" element={<AuthGate><OrganizationManagementPage /></AuthGate>} />
           <Route path="/app/account-security" element={<AuthGate><AccountSecurityPage /></AuthGate>} />

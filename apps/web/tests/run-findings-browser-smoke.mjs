@@ -27,7 +27,7 @@ async function until(fn,timeout=24_000){
   }
   throw Error("FINDINGS_BROWSER_TIMEOUT");
 }
-let completed=0;
+let completed=0,planCompleted=0;
 try{
   await until(status);
   for(const browserName of ["chromium","firefox"]){
@@ -111,13 +111,82 @@ try{
         process.stdout.write("FINDINGS_"+browserName.toUpperCase()+"_SAVED_API_RUNTIME_PASS\n");
         completed++;
       }finally{await context.close();}
+      for(const scenario of ["owner","analyst","viewer","unverified"]){
+        const query=scenario==="unverified"?"role=owner&mode=unverified":"role="+scenario;
+        const planContext=await browser.newContext({acceptDownloads:false,
+          viewport:{width:1280,height:900}});
+        const page=await planContext.newPage();
+        try{
+          await page.goto(base+"/app/assessment-plans?"+query,
+            {waitUntil:"domcontentloaded",timeout:20_000});
+          await page.getByRole("heading",{name:"Runtime assessment plans"}).waitFor({timeout:16_000});
+          await page.getByText("Synthetic seeded written authorization")
+            .first().waitFor({timeout:16_000});
+          await page.getByText("Public customer scanning remains").first()
+            .waitFor({timeout:12_000});
+          const save=page.getByRole("button",{name:"Authorize assessment plan (no scan)"});
+          if(scenario==="viewer"){
+            if(!(await save.isDisabled()))throw Error("VIEWER_CAN_AUTHORIZE_PLAN");
+            if(await page.getByRole("button",{name:"Revoke permission"}).count()!==0)
+              throw Error("VIEWER_CAN_REVOKE_PLAN");
+          }else if(scenario==="unverified"){
+            await page.getByText("No currently verified assets").waitFor();
+            if(!(await save.isDisabled()))throw Error("UNVERIFIED_PLAN_CAN_AUTHORIZE");
+          }else{
+            const seedRevokes=page.getByRole("button",{name:"Revoke permission"});
+            if(scenario==="analyst" && !(await seedRevokes.first().isDisabled()))
+              throw Error("ANALYST_CAN_REVOKE_ANOTHER_ACTOR_PLAN");
+            const asset="00000000-0000-4000-8000-000000000022";
+            await page.locator("#plan-asset").selectOption(asset);
+            await page.locator("#plan-paths").fill("/\n/health");
+            await page.locator("#plan-reference").fill(
+              "Written synthetic permission for exact scoped GET endpoints");
+            await page.getByRole("checkbox").check();
+            if(await save.isDisabled())throw Error("VERIFIED_PLAN_AUTHORIZE_DISABLED");
+            const before=(await status()).planCreateCount;
+            await save.click();
+            await until(async()=>((await status()).planCreateCount>before));
+            await page.getByText("Authorization saved. No network assessment was executed.").waitFor();
+            await page.getByRole("button",{name:"Inspect audit and live eligibility"}).first().click();
+            await page.getByText("Current proof check:").waitFor({timeout:12_000});
+            await page.getByText("ELIGIBLE_FOR_FUTURE_REVIEW").first().waitFor({timeout:12_000});
+            if(scenario==="owner"){
+              const revokes=page.getByRole("button",{name:"Revoke permission"});
+              const initial=(await status()).planRevokeCount;
+              await revokes.first().click();
+              await until(async()=>((await status()).planRevokeCount>initial));
+              await page.getByText("Authorization revoked. Future use denied.").waitFor();
+              await page.locator("#plan-asset")
+                .selectOption("00000000-0000-4000-8000-000000000088");
+              await page.locator("#plan-paths").fill("/v1/health");
+              await page.locator("#plan-reference").fill(
+                "Owner written permission for controlled API read-only review");
+              await page.getByRole("checkbox").check();
+              const current=(await status()).planCreateCount;
+              await save.click();
+              await until(async()=>((await status()).planCreateCount>current));
+              await page.getByText("api_readonly", {exact:false}).first()
+                .waitFor({timeout:12_000});
+            }
+          }
+          const current=await status();
+          if(current.webScanCount!==0||current.planNetworkCount!==0)
+            throw Error("PLAN_SCREEN_STARTED_CUSTOMER_SCAN");
+          process.stdout.write("ASSESSMENT_PLANS_"+browserName.toUpperCase()+
+            "_"+scenario.toUpperCase()+"_PASS\n");
+          planCompleted++;
+        }finally{await planContext.close();}
+      }
     }finally{await browser.close();}
   }
   const current=await status();
-  if(completed!==10||current.webScanCount!==0||current.exportPdfCount<1||
+  if(completed!==10||planCompleted!==8||current.webScanCount!==0||
+     current.planNetworkCount!==0||current.planCreateCount<6||
+     current.planRevokeCount<2||current.exportPdfCount<1||
      current.exportJsonCount<1||!current.actions.some(x=>x.action==="retest_request"))
     throw Error("FINDINGS_BROWSER_WORKFLOW_INCOMPLETE");
   process.stdout.write("FINDINGS_CHROMIUM_FIREFOX_10_OF_10_PASS\n");
+  process.stdout.write("ASSESSMENT_PLANS_CHROMIUM_FIREFOX_8_OF_8_PASS\n");
 }catch(error){
   process.stderr.write("FINDINGS_BROWSER_NOT_QUALIFIED:"+String(error).slice(0,700)+"\n");
   process.exitCode=1;

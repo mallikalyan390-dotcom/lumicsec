@@ -1,6 +1,7 @@
 // Browser-only synthetic customer API; no Supabase, network scan or real account.
 import { createServer } from "node:http";
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 import process from "node:process";
 import { readFile, stat } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
@@ -10,6 +11,8 @@ const dist=resolve(dirname(fileURLToPath(import.meta.url)),"../dist");
 const port=5195;
 const org="00000000-0000-4000-8000-000000000011";
 const asset="00000000-0000-4000-8000-000000000022";
+const apiAsset="00000000-0000-4000-8000-000000000088";
+const seedPlan="00000000-0000-4000-8000-000000000099";
 const actor="00000000-0000-4000-8000-000000000033";
 const job="00000000-0000-4000-8000-000000000044";
 const findingId="00000000-0000-4000-8000-000000000055";
@@ -23,6 +26,26 @@ if(!apiObservation)throw Error("ACTUAL_API_RUNTIME_EVIDENCE_MISSING");
 
 const stateByRole=new Map();
 const actions=[];
+const planStateByRole=new Map();
+let planCreateCount=0,planRevokeCount=0,planNetworkCount=0;
+function scopedPlanState(role){
+ if(!planStateByRole.has(role)){
+  const seeded={id:seedPlan,organization_id:org,asset_id:asset,
+   asset_kind:"website",exact_origin:"https://synthetic.fixture-web.net",
+   safe_profile:"web_readonly",approved_paths:["/"],http_method:"GET",
+   max_requests:3,max_response_bytes:60000,max_total_bytes:240000,
+   max_execution_ms:15000,authorization_reference:"Synthetic seeded written authorization",
+   scope_sha256:"a".repeat(64),proof_verified_at:"2026-11-19T00:00:00Z",
+   proof_expires_at:"2099-01-01T00:00:00Z",expires_at:"2099-01-01T00:00:00Z",
+   plan_state:"active",created_at:"2026-11-19T02:00:00Z",
+   created_by:"00000000-0000-4000-8000-000000000044",revoked_at:null};
+  planStateByRole.set(role,{plans:[seeded],
+   events:new Map([[seedPlan,[{id:1,actor_id:seeded.created_by,
+    event_type:"scope_authorized",details:{scopeSha256:seeded.scope_sha256,
+     scanningEnabled:false},created_at:seeded.created_at}] ]])});
+ }
+ return planStateByRole.get(role);
+}
 let importCount=0,exportPdfCount=0,exportJsonCount=0,webScanCount=0;
 const send=(res,status,body,contentType="application/json")=>{
   res.writeHead(status,{"content-type":contentType,"cache-control":"private, no-store"});
@@ -60,6 +83,7 @@ const server=createServer(async(req,res)=>{
     const unverified=cookies.includes("synthetic_status=unverified");
     const apiMode=cookies.includes("synthetic_runtime=api");
     const state=roleState(role+(apiMode?"-runtime":""));
+    const planState=scopedPlanState(role+(unverified?"-unverified":""));
     if(apiMode){
       state.finding.assessment_kind="api_runtime_review";
       state.finding.rule_id=apiObservation.ruleId;
@@ -77,7 +101,10 @@ const server=createServer(async(req,res)=>{
       display_name:apiMode?"Controlled API review asset":"Synthetic reviewed HTTPS asset",
       canonical_origin:apiMode?"https://controlled-api.fixture-api.net":"https://synthetic.fixture-web.net",
       verification_status:unverified?"pending":"verified",
+      verified_at:unverified?null:"2026-11-19T00:00:00Z",
       verification_expires_at:unverified?null:"2099-01-01T00:00:00Z"};
+    const apiAssetRow={...assetRow,id:apiAsset,asset_kind:"api",
+      display_name:"Synthetic verified API asset",canonical_origin:"https://controlled-api.fixture-api.net"};
     if(path==="/auth/session")return send(res,200,{configured:true,state:"authenticated",
       csrfToken:"synthetic-csrf",user:{id:actor,email:"qa-synthetic@example.invalid"}});
     if(path==="/v1/organizations")return send(res,200,{
@@ -85,7 +112,68 @@ const server=createServer(async(req,res)=>{
         created_at:"2026-01-01T00:00:00Z"}],
       memberships:[{organization_id:org,member_role:role,member_status:"active"}],
     });
-    if(path==="/v1/assets")return send(res,200,{assets:[assetRow]});
+    if(path==="/v1/assets")return send(res,200,{assets:[assetRow,apiAssetRow]});
+    if(path==="/v1/assessment-plans"&&req.method==="GET")
+      return send(res,200,{plans:planState.plans,scanningEnabled:false,
+       executionAllowed:false});
+    if(path==="/v1/assessment-plans/events"&&req.method==="GET"){
+      const id=url.searchParams.get("planId");
+      if(!planState.plans.some(p=>p.id===id))
+       return send(res,403,{error:"PLAN_NOT_VISIBLE"});
+      return send(res,200,{events:planState.events.get(id)??[],scanningEnabled:false});
+    }
+    if(path==="/v1/assessment-plans/check"&&req.method==="GET"){
+      const plan=planState.plans.find(p=>p.id===url.searchParams.get("planId"));
+      if(!plan)return send(res,403,{error:"PLAN_NOT_VISIBLE"});
+      return send(res,200,{result:{eligibility:plan.plan_state==="revoked"?"REVOKED":
+        unverified?"OWNERSHIP_CHANGED":"ELIGIBLE_FOR_FUTURE_REVIEW",
+        authorizedForPlanning:!unverified&&plan.plan_state==="active",
+        publicScanningEnabled:false,executionAllowed:false,
+        scopeSha256:plan.scope_sha256}});
+    }
+    if(path==="/v1/assessment-plans"&&req.method==="POST"){
+      let data="";for await(const part of req){data+=part.toString("utf8");if(data.length>3500)break;}
+      const request=JSON.parse(data);
+      if(role==="viewer"||unverified||!["website","api"].includes(
+        request.profile==="web_readonly"?"website":request.profile==="api_readonly"?"api":""))
+       return send(res,403,{error:"PLAN_NOT_AUTHORIZED"});
+      const selected=request.assetId===apiAsset?apiAssetRow:request.assetId===asset?assetRow:null;
+      if(!selected||!["web_readonly","api_readonly"].includes(request.profile)||
+       request.authorization!=="I_AM_AUTHORIZED_TO_PLAN_READONLY_ASSESSMENT_OF_THIS_OWNED_ASSET"||
+       request.approvedPaths?.length<1||request.approvedPaths?.length>6||
+       (request.profile==="web_readonly"?"website":"api")!==selected.asset_kind)
+       return send(res,400,{error:"BAD_EXPLICIT_SCOPE"});
+      const current=new Date().toISOString();
+      const plan={id:randomUUID(),organization_id:org,asset_id:selected.id,
+       asset_kind:selected.asset_kind,exact_origin:selected.canonical_origin,
+       safe_profile:request.profile,approved_paths:request.approvedPaths,http_method:"GET",
+       max_requests:request.maxRequests,max_response_bytes:request.maxResponseBytes,
+       max_total_bytes:request.maxTotalBytes,max_execution_ms:request.maxExecutionMs,
+       authorization_reference:request.authorizationReference,
+       proof_verified_at:selected.verified_at,proof_expires_at:selected.verification_expires_at,
+       scope_sha256:"b".repeat(64),expires_at:request.expiresAt,plan_state:"active",
+       created_at:current,created_by:actor,revoked_at:null};
+      planState.plans.unshift(plan);
+      planState.events.set(plan.id,[{id:2,actor_id:actor,event_type:"scope_authorized",
+       details:{scopeSha256:plan.scope_sha256,paths:plan.approved_paths,scanningEnabled:false},
+       created_at:current}]);
+      planCreateCount++;
+      return send(res,201,{planId:plan.id,scanningEnabled:false,executionAllowed:false,
+       explanation:"Saved scope and permission only. No scanning job was created."});
+    }
+    if(path==="/v1/assessment-plans/revoke"&&req.method==="POST"){
+      let data="";for await(const part of req){data+=part.toString("utf8");if(data.length>1000)break;}
+      const request=JSON.parse(data);
+      const plan=planState.plans.find(p=>p.id===request.planId);
+      if(!plan||role==="viewer"||role==="analyst"&&plan.created_by!==actor)
+        return send(res,403,{error:"PLAN_REVOCATION_DENIED"});
+      plan.plan_state="revoked";plan.revoked_at=new Date().toISOString();
+      planState.events.get(plan.id).push({id:3,actor_id:actor,
+       event_type:"authorization_revoked",details:{scopeSha256:plan.scope_sha256,
+        scanningEnabled:false},created_at:plan.revoked_at});
+      planRevokeCount++;
+      return send(res,200,{revoked:true,executionAllowed:false,scanningEnabled:false});
+    }
     if(path==="/v1/organizations/"+org+"/members")return send(res,200,{members:[{
       user_id:actor,member_email:"synthetic-owner@example.invalid",
       member_role:"owner",member_status:"active",joined_at:"2026-01-01T00:00:00Z",
@@ -145,6 +233,9 @@ const server=createServer(async(req,res)=>{
     }
     if(path==="/__status")return send(res,200,{
       actions,importCount,exportPdfCount,exportJsonCount,webScanCount,
+      planCreateCount,planRevokeCount,planNetworkCount,
+      planStates:[...planStateByRole.entries()].map(([role,s])=>({
+       role,plans:s.plans.length,revoked:s.plans.filter(p=>p.plan_state==="revoked").length})),
       state:[...stateByRole.entries()].map(([role,s])=>({role,
         conclusion:s.finding.reviewer_conclusion,retests:s.retests.length})),
     });
@@ -155,10 +246,13 @@ const server=createServer(async(req,res)=>{
     const data=await readFile(file);
     const mime={".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css"};
     const headers={"content-type":mime[extname(file)]??"application/octet-stream","cache-control":"no-store"};
-    if(file.endsWith(".html") && (path==="/app/findings"||path==="/")){
+    if(file.endsWith(".html") && (path==="/app/findings"||path==="/app/assessment-plans"||path==="/")){
       // Reset only this synthetic role fixture between independent browser runs.
       stateByRole.delete((url.searchParams.get("role")??"owner")+
         (url.searchParams.get("runtime")==="api"?"-runtime":""));
+      if(path==="/app/assessment-plans")
+       planStateByRole.delete((url.searchParams.get("role")??"owner")+
+        (url.searchParams.get("mode")==="unverified"?"-unverified":""));
       headers["set-cookie"]=[
         "synthetic_role="+(url.searchParams.get("role")??"owner")+"; Path=/; SameSite=Lax",
         "synthetic_runtime="+(url.searchParams.get("runtime")==="api"?"api":"web")+

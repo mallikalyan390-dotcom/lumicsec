@@ -24,6 +24,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
     { to: "/app/api-security", label: "API Security", icon: FileSearch, end: false },
     { to: "/app/web-security", label: "Website Security", icon: Globe2, end: false },
     { to: "/app/findings", label: "Findings & reports", icon: ClipboardList, end: false },
+    { to: "/app/assessment-plans", label: "Assessment plans", icon: ClipboardList, end: false },
     { to: "/app/assets", label: "Assets & ownership", icon: Globe2, end: false },
     { to: "/app/organizations", label: "Team & organization", icon: ShieldCheck, end: false },
     { to: "/app/account-security", label: "Account security", icon: LockKeyhole, end: false },
@@ -83,6 +84,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
           <NavLink to="/app/api-security" className="rounded-lg border border-white/10 px-3 py-2">API Security</NavLink>
           <NavLink to="/app/web-security" className="rounded-lg border border-white/10 px-3 py-2">Web Security</NavLink>
           <NavLink to="/app/findings" className="rounded-lg border border-white/10 px-3 py-2">Findings & reports</NavLink>
+          <NavLink to="/app/assessment-plans" className="rounded-lg border border-white/10 px-3 py-2">Assessment plans</NavLink>
           <NavLink to="/app/assets" className="rounded-lg border border-white/10 px-3 py-2">Assets</NavLink>
           <NavLink to="/app/organizations" className="rounded-lg border border-white/10 px-3 py-2">Team</NavLink>
           <NavLink to="/app/account-security" className="rounded-lg border border-white/10 px-3 py-2">Account security</NavLink>
