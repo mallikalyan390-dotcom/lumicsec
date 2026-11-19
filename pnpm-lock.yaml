@@ -214,6 +214,9 @@ importers:
       '@lumicsec/validation':
         specifier: workspace:*
         version: link:../../packages/validation
+      '@lumicsec/web-security-engine':
+        specifier: workspace:*
+        version: link:../../packages/web-security-engine
       '@supabase/ssr':
         specifier: ^0.7.0
         version: 0.7.0(@supabase/supabase-js@2.119.0)

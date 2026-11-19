@@ -22,6 +22,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
   const navItems = [
     { to: "/app", label: "Overview", icon: LayoutDashboard, end: true },
     { to: "/app/api-security", label: "API Security", icon: FileSearch, end: false },
+    { to: "/app/web-security", label: "Website Security", icon: Globe2, end: false },
     { to: "/app/assets", label: "Assets & ownership", icon: Globe2, end: false },
     { to: "/app/organizations", label: "Team & organization", icon: ShieldCheck, end: false },
     { to: "/app/account-security", label: "Account security", icon: LockKeyhole, end: false },
@@ -54,7 +55,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
         </nav>
         <div className="mt-8 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">In development</div>
         <div className="mt-3 space-y-2 px-2 text-xs text-slate-500">
-          <div className="flex items-center justify-between"><span>Website Security</span><Badge>Later</Badge></div>
+          <div className="flex items-center justify-between"><span>Public Web scans</span><Badge>Disabled</Badge></div>
           <div className="flex items-center justify-between"><span>Ownership verification</span><Badge>Later</Badge></div>
           <div className="flex items-center justify-between"><span>Findings & reports</span><Badge>Later</Badge></div>
           <div className="flex items-center justify-between"><span>Monitoring</span><Badge>Later</Badge></div>
@@ -79,6 +80,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
         <nav className="flex flex-wrap gap-2 border-b border-white/10 px-5 py-3 text-xs lg:hidden" aria-label="Workspace navigation">
           <NavLink to="/app" end className="rounded-lg border border-white/10 px-3 py-2">Overview</NavLink>
           <NavLink to="/app/api-security" className="rounded-lg border border-white/10 px-3 py-2">API Security</NavLink>
+          <NavLink to="/app/web-security" className="rounded-lg border border-white/10 px-3 py-2">Web Security</NavLink>
           <NavLink to="/app/assets" className="rounded-lg border border-white/10 px-3 py-2">Assets</NavLink>
           <NavLink to="/app/organizations" className="rounded-lg border border-white/10 px-3 py-2">Team</NavLink>
           <NavLink to="/app/account-security" className="rounded-lg border border-white/10 px-3 py-2">Account security</NavLink>
