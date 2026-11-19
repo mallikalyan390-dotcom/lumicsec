@@ -12,7 +12,8 @@ const asset="00000000-0000-4000-8000-000000000022";
 const actor="00000000-0000-4000-8000-000000000033";
 const insecureJob="00000000-0000-4000-8000-000000000044";
 const secureJob="00000000-0000-4000-8000-000000000045";
-const finger="c".repeat(64);
+const workerResult=JSON.parse(await readFile(new URL("./web-sandbox-actual-result.json",import.meta.url),"utf8"));
+// These are the actual restricted Docker IPC observations from controlled TLS, not mock rule strings.
 const reports=[];
 let webQueueRequests=0;
 let webCancelRequests=0;
@@ -40,16 +41,18 @@ const script=`<script>
   result.scanDisabled=text().includes("Customer network scanning is")&&text().includes("not activated");
   result.noActiveScan=![...document.querySelectorAll("button")].some(b=>
     b.textContent.includes("Start authorized Web assessment")&&!b.disabled);
+  if(!member&&!unverified) await wait(()=>assetSelect.options.length===2);
   result.verifiedSelection=unverified ? assetSelect.options.length===1 : member ? assetSelect.disabled : assetSelect.options.length===2;
   result.memberReadOnly=member ? document.querySelectorAll("input[type=checkbox]").length === 0 : true;
-  if(unverified&&!member)result.unverifiedNotice=text().includes("No currently verified website");
+  if(unverified&&!member){await wait(()=>text().includes("No currently verified website"));result.unverifiedNotice=true;}
   const reviews=await wait(()=>[...document.querySelectorAll("button")].filter(b=>b.textContent.includes("Review evidence")).length===2
     ? [...document.querySelectorAll("button")].filter(b=>b.textContent.includes("Review evidence")):null);
   reviews[0].click();
   await wait(()=>text().includes("P09.HSTS.ABSENT"));
-  result.insecureEvidence=text().includes("Missing HSTS passive signal") &&
-    text().includes("Remediation: Configure HSTS")&&text().includes("Source fingerprints")&&
-    text().includes("Observed HTTPS paths: /");
+  result.insecureEvidence=text().includes("HSTS header absent on observed HTTPS response") &&
+    text().includes("Remediation: Evaluate enabling Strict-Transport-Security")&&
+    text().includes("Source fingerprints")&&text().includes("Observed HTTPS paths: /")&&
+    ["P09.CSP.ABSENT","P09.FRAME.NO_POLICY","P09.COOKIE.SECURE_AGG"].every(x=>text().includes(x));
   reviews[1].click();
   await wait(()=>text().includes("No review observations recorded"));
   result.secureNoFalseSignal=true;
@@ -86,8 +89,7 @@ const server=createServer(async(req,res)=>{
         scope_hash:"a".repeat(64),requested_at:"2026-11-19T00:00:00Z",
         started_at:"2026-11-19T00:00:01Z",completed_at:"2026-11-19T00:00:03Z",
         authorization_at:"2026-11-19T00:00:00Z",web_origin:"https://insecure.fixture-web.net",
-        observation_count:4,web_report:{classification:"PASSIVE_WEB_REVIEW",requests:2,fetched:2,bytes:400,
-          coverageState:"BOUNDED",limitations:["Not confirmed"]}},
+        observation_count:workerResult.observations.length,web_report:workerResult.report},
       {id:secureJob,organization_id:org,asset_id:asset,job_state:"succeeded",
         scope_hash:"b".repeat(64),requested_at:"2026-11-18T00:00:00Z",
         authorization_at:"2026-11-18T00:00:00Z",web_origin:"https://secure.fixture-web.net",
@@ -96,15 +98,16 @@ const server=createServer(async(req,res)=>{
     ],
   });
   if(path==="/v1/assessments/web/observations"&&req.method==="GET")
-    return send(res,200,{observations:url.searchParams.get("jobId")===insecureJob?[{
-      id:"00000000-0000-4000-8000-000000000055",rule_id:"P09.HSTS.ABSENT",
-      title:"Missing HSTS passive signal",summary:"Observed HTTPS response without HSTS.",
-      remediation:"Configure HSTS on the HTTPS site.",
-      limitation:"Signal only. Not a confirmed exploitable vulnerability.",
-      observation_classification:"DETERMINISTIC_CONFIGURATION_SIGNAL",
-      evidence_source:{nodeIds:["wdn_0123456789abcdef01234567"],fingerprints:[finger],paths:["/"]},
-      severity_estimate:"low",review_state:"review_required",
-    }]:[]});
+    return send(res,200,{observations:url.searchParams.get("jobId")===insecureJob
+      ? workerResult.observations.map((observation,index)=>({
+        id:"00000000-0000-4000-8000-00000000005"+index,
+        rule_id:observation.ruleId,title:observation.title,
+        summary:observation.summary,remediation:observation.remediation,
+        limitation:observation.limitation,
+        observation_classification:observation.classification,
+        evidence_source:observation.evidenceSource,
+        severity_estimate:observation.severityEstimate,review_state:"review_required",
+      })) : []});
   if(path==="/v1/assessments/web"&&req.method==="POST") {
     webQueueRequests++;return send(res,423,{error:"CUSTOMER_WEB_EXECUTION_NOT_APPROVED"});
   }

@@ -7,7 +7,9 @@
     "dev": "node --env-file=../../.env --import tsx --watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:isolated-web": "node scripts/build-isolated-web-worker.mjs",
+    "test:sandbox": "LUMICSEC_RUN_DOCKER_SANDBOX=1 vitest run tests/web-isolated-container.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -15,9 +17,9 @@
     "@fastify/helmet": "^13.0.1",
     "@fastify/rate-limit": "^10.3.0",
     "@lumicsec/api-security-engine": "workspace:*",
-    "@lumicsec/web-security-engine": "workspace:*",
     "@lumicsec/shared": "workspace:*",
     "@lumicsec/validation": "workspace:*",
+    "@lumicsec/web-security-engine": "workspace:*",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.119.0",
     "fastify": "^5.12.8",
@@ -29,6 +31,7 @@
     "@types/node": "^26.0.0",
     "@types/pngjs": "6.0.5",
     "@types/qrcode": "1.5.6",
+    "esbuild": "0.28.2",
     "jsqr": "1.4.0",
     "pngjs": "5.0.0",
     "tsx": "^4.20.6",
