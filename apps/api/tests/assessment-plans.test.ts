@@ -220,6 +220,37 @@ describe("AAL2-bound tenant runtime plan API with customer execution disabled",(
     expect(response.statusCode).toBe(403);
     expect(db.from).not.toHaveBeenCalledWith("assessment_plan_events");
   });
+  it("signed tenant plan history returns bounded public-safe fixture job fields only",async()=>{
+    const s=await app();
+    const response=await s.inject({method:"GET",
+      url:"/v1/assessment-plans/executions?organizationId="+ORG+"&planId="+PLAN});
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({executions:[],scanningEnabled:false,
+      executionAllowed:false});
+    expect(db.from).toHaveBeenCalledWith("assessment_plan_executions");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+  it("denies cross-tenant execution history before touching execution table",async()=>{
+    db.from.mockImplementation((table:string)=>({
+      select:vi.fn().mockReturnThis(),eq:vi.fn().mockReturnThis(),
+      single:vi.fn().mockResolvedValue({data:table==="assessment_plans"?null:{id:PLAN},
+        error:table==="assessment_plans"?{code:"PGRST116"}:null}),
+    }));
+    const s=await app();
+    const response=await s.inject({method:"GET",
+      url:"/v1/assessment-plans/executions?organizationId="+ORG+"&planId="+PLAN});
+    expect(response.statusCode).toBe(403);
+    expect(db.from).not.toHaveBeenCalledWith("assessment_plan_executions");
+  });
+  it("denies AAL1 plan execution history before database access",async()=>{
+    db.auth.getClaims.mockResolvedValue({data:{claims:{aal:"aal1",
+      amr:[{method:"oauth"}]}},error:null});
+    const s=await app();
+    const response=await s.inject({method:"GET",
+      url:"/v1/assessment-plans/executions?organizationId="+ORG+"&planId="+PLAN});
+    expect(response.statusCode).toBe(403);
+    expect(db.from).not.toHaveBeenCalled();
+  });
   it("no customer execute endpoint exists; preexisting public Web scan stays disabled",async()=>{
     const s=await app();
     expect((await s.inject({method:"POST",url:"/v1/assessment-plans/execute",

@@ -51,6 +51,13 @@ export function fixtureOrigin(profile:ControlledProfile){
 export async function openControlledRuntimeBroker(input:Readonly<{
   executionId:string; origin:string; profile:ControlledProfile; signal:AbortSignal;
   maxRequests?:number;
+  /** A signed, current plan's immutable, exact destination budget.
+   * Undefined keeps the original controlled-fixture regression behavior.
+   */
+  approvedPaths?:readonly string[];
+  maxResponseBytes?:number;
+  maxTotalBytes?:number;
+  maxExecutionMs?:number;
   /** Only the test-only broker container may mount this fixed AF_UNIX path. */
   socketDirectory?:"/opt/lumicsec-broker";
   onStatistics?:(stats:Readonly<{requests:number;bytes:number;failures:number;
@@ -59,6 +66,22 @@ export async function openControlledRuntimeBroker(input:Readonly<{
   const origin=fixtureOrigin(input.profile);
   if(input.origin!==origin||!z.string().uuid().safeParse(input.executionId).success||
     input.signal.aborted)throw Error("BROKER_TEST_SCOPE_DENIED");
+  if(input.approvedPaths!==undefined&&(
+    input.approvedPaths.length<1||input.approvedPaths.length>6||
+    new Set(input.approvedPaths).size!==input.approvedPaths.length||
+    input.approvedPaths.some(p=>!/^\/[a-zA-Z0-9._~/-]{0,119}$/.test(p)||
+      p.includes("//")||/(^|\/)\.{1,2}(\/|$)/.test(p))))
+    throw Error("BROKER_PLAN_PATH_SCOPE_DENIED");
+  if(input.maxRequests!==undefined&&(input.maxRequests<1||input.maxRequests>6)||
+    input.maxResponseBytes!==undefined&&
+      (input.maxResponseBytes<1024||input.maxResponseBytes>60000)||
+    input.maxTotalBytes!==undefined&&
+      (input.maxTotalBytes<1024||input.maxTotalBytes>240000)||
+    input.maxExecutionMs!==undefined&&
+      (input.maxExecutionMs<1000||input.maxExecutionMs>15000)||
+    input.maxTotalBytes!==undefined&&input.maxResponseBytes!==undefined&&
+      input.maxTotalBytes<input.maxResponseBytes)
+    throw Error("BROKER_PLAN_BUDGET_DENIED");
   const directory=await mkdtemp(join(tmpdir(),"lumicsec-controlled-broker-"));
   const socketDirectory=input.socketDirectory??join(directory,"broker-only");
   if(!input.socketDirectory)await mkdir(socketDirectory,{mode:0o755});
@@ -69,7 +92,10 @@ export async function openControlledRuntimeBroker(input:Readonly<{
   const aborters=new Set<AbortController>();
   let used=0,bytes=0,active=0;
   let failure=0;
-  const maxRequests=Math.min(input.maxRequests??6,8);
+  const maxRequests=Math.min(input.maxRequests??6,6);
+  const byteLimit=input.maxTotalBytes??240_000;
+  const responseLimit=input.maxResponseBytes??60_000;
+  const runtimeLimit=input.maxExecutionMs??15_000;
   const started=Date.now();
   const keyPath=join(directory,"test-only.key"), certPath=join(directory,"test-only.crt");
   const failClosed=()=>{for(const a of aborters)a.abort();
@@ -170,13 +196,15 @@ export async function openControlledRuntimeBroker(input:Readonly<{
         try{req=brokerRequestSchema.parse(JSON.parse(text.slice(0,-1)));}
         catch{return reject();}
         if(req.protocol!==BROKER_PROTOCOL||req.executionId!==input.executionId||
-          req.origin!==origin||input.signal.aborted||Date.now()-started>15_000||
+          req.origin!==origin||input.signal.aborted||Date.now()-started>runtimeLimit||
           active>=1||used>=maxRequests)return reject();
         // A compromised worker may send an arbitrary string. Validate before
         // parsing URL components: malformed input must never crash the broker.
         let authorizedUrl:URL;
         try{authorizedUrl=requireExactWebUrl(req.url,origin);}
         catch{return reject();}
+        if(input.approvedPaths&&
+          !input.approvedPaths.includes(authorizedUrl.pathname))return reject();
         if(apiProfiles.has(input.profile)){
           if(!["/v1/health","/v1/accounts/owner"].includes(authorizedUrl.pathname))
             return reject();
@@ -196,7 +224,7 @@ export async function openControlledRuntimeBroker(input:Readonly<{
         const local=new PublicPinnedWebTransport(
           async()=>[{address:"8.8.8.8",family:4}],selected);
         void (identity==="anonymous"?transport:local).read(origin,req.url,{
-          signal:ac.signal,maxBytes:Math.min(60_000,240_000-bytes),
+          signal:ac.signal,maxBytes:Math.min(responseLimit,byteLimit-bytes),
         }).then(response=>{
           bytes+=response.bodyBytes.byteLength;
           const result=brokerReplySchema.parse({

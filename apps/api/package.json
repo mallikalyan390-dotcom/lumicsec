@@ -14,7 +14,8 @@
     "test:controlled-runtime": "LUMICSEC_RUN_CONTROLLED_RUNTIME=1 vitest run tests/controlled-runtime-container.test.ts",
     "capture:controlled-runtime": "node --import tsx scripts/capture-controlled-runtime-fixtures.mjs",
     "build:confined-broker": "node scripts/build-confined-broker.mjs",
-    "test:confined-broker": "LUMICSEC_RUN_CONFINED_BROKER=1 vitest run tests/confined-runtime-container.test.ts"
+    "test:confined-broker": "LUMICSEC_RUN_CONFINED_BROKER=1 vitest run tests/confined-runtime-container.test.ts",
+    "test:authorized-plan-fixture": "LUMICSEC_RUN_AUTHORIZED_PLAN_DOCKER=1 vitest run tests/authorized-plan-controlled-container.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

@@ -76,6 +76,30 @@ export async function assessmentPlanRoutes(app:FastifyInstance){
     if(error)return reply.code(503).send({error:"PLAN_HISTORY_UNAVAILABLE"});
     return {events:data??[],scanningEnabled:false};
   });
+  /** Read-only controlled-fixture execution history. No start/scan route.
+   * AAL2 Fastify, plan visibility first, then signed-user tenant RLS.
+   * Never return worker tokens, lease hashes, secrets or raw HTTP payloads.
+   */
+  app.get("/v1/assessment-plans/executions",{
+    preHandler:requireGoogleAal2,
+  },async(req,reply)=>{
+    reply.header("cache-control","private, no-store");
+    const parsed=planQuery.safeParse(req.query);
+    if(!parsed.success)return reply.code(400).send({error:"INVALID_PLAN"});
+    const client=createSupabaseForRequest(req,reply);
+    if(!client)return reply.code(503).send({error:"AUTH_NOT_CONFIGURED"});
+    const {data:plan,error:planError}=await client.from("assessment_plans")
+      .select("id").eq("organization_id",parsed.data.organizationId)
+      .eq("id",parsed.data.planId).single();
+    if(planError||!plan)return reply.code(403).send({error:"PLAN_ACCESS_DENIED"});
+    const {data,error}=await client.from("assessment_plan_executions")
+      .select("id,organization_id,plan_id,asset_id,requested_by,scope_hash,exact_origin,safe_profile,status,lease_generation,result_count,created_at,started_at,completed_at,error_code")
+      .eq("organization_id",parsed.data.organizationId)
+      .eq("plan_id",parsed.data.planId).order("created_at",{ascending:false}).limit(30);
+    if(error)return reply.code(503).send({error:"FIXTURE_EXECUTION_HISTORY_UNAVAILABLE"});
+    return {executions:data??[],executionAllowed:false,scanningEnabled:false,
+      explanation:"Local controlled-fixture evidence only; no customer network scanning."};
+  });
   app.post("/v1/assessment-plans",{
     preHandler:requireGoogleAal2,config:{rateLimit:{max:5,timeWindow:"1 minute"}},
   },async(req,reply)=>{

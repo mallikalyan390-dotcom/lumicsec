@@ -25,9 +25,13 @@ export async function runControlledRuntimeFixture(input:Readonly<{
   scope:Scope;mode:"web"|"api";profile:ControlledProfile;
   bundlePath:string;signal:AbortSignal;onReady?:()=>void;
   brokerIsolation?:"host_fixture"|"confined_fixture";
+  planScope?:Readonly<{approvedPaths:readonly string[];maxRequests:number;
+    maxResponseBytes:number;maxTotalBytes:number;maxExecutionMs:number}>;
   onBrokerReady?:(containerName:string)=>void;
 }>):Promise<Readonly<{result:ControlledResult;requests:number;bytes:number;
   externalRequests:0;brokerNetworkMode:"host"|"none"}>>{
+  if(input.planScope&&input.brokerIsolation!=="confined_fixture")
+    throw Error("CONTROLLED_PLAN_REQUIRES_CONFINED_BROKER");
   if(active.has(input.scope.jobId)||active.size>=2||input.signal.aborted ||
     (input.mode==="web")!==(input.profile.startsWith("web_"))||
     input.scope.origin!==fixtureOrigin(input.profile))
@@ -53,6 +57,7 @@ export async function runControlledRuntimeFixture(input:Readonly<{
         executionId:start.executionId,origin:input.scope.origin,
         profile:input.profile,signal:controller.signal,
         bundlePath:join(dirname(bundle),"confined-broker.mjs"),
+        ...(input.planScope?{planScope:input.planScope}:{}),
       })
       :await openControlledRuntimeBroker({
         executionId:start.executionId,origin:input.scope.origin,

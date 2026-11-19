@@ -29,10 +29,23 @@ const limitedEnv={PATH:process.env["PATH"]??"/usr/bin:/bin",HOME:"/tmp"};
 export async function openConfinedRuntimeBroker(input:Readonly<{
   executionId:string;origin:string;profile:ControlledProfile;
   bundlePath:string;signal:AbortSignal;
+  planScope?:Readonly<{approvedPaths:readonly string[];maxRequests:number;
+    maxResponseBytes:number;maxTotalBytes:number;maxExecutionMs:number}>;
 }>){
   if(!z.string().uuid().safeParse(input.executionId).success||
     input.origin!==fixtureOrigin(input.profile)||input.signal.aborted)
     throw Error("CONFINED_BROKER_SCOPE_DENIED");
+  const scoped=z.strictObject({
+    approvedPaths:z.array(z.string().regex(/^\/[a-zA-Z0-9._~/-]{0,119}$/)).min(1).max(6),
+    maxRequests:z.number().int().min(1).max(6),
+    maxResponseBytes:z.number().int().min(1024).max(60000),
+    maxTotalBytes:z.number().int().min(1024).max(240000),
+    maxExecutionMs:z.number().int().min(1000).max(15000),
+  }).optional().safeParse(input.planScope);
+  if(!scoped.success||(scoped.data&&(
+    new Set(scoped.data.approvedPaths).size!==scoped.data.approvedPaths.length||
+    scoped.data.maxTotalBytes<scoped.data.maxResponseBytes)))
+    throw Error("CONFINED_BROKER_PLAN_SCOPE_DENIED");
   const bundle=await realpath(input.bundlePath);
   if(!bundle.endsWith("/dist/isolated/confined-broker.mjs")||
     !(await stat(bundle)).isFile())throw Error("CONFINED_BROKER_BUNDLE_DENIED");
@@ -67,6 +80,8 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
       "--env","LUMICSEC_CONTROLLED_FIXTURE=yes",
       "--env","LUMICSEC_BROKER_PROFILE="+input.profile,
       "--env","LUMICSEC_BROKER_EXECUTION_ID="+input.executionId,
+      ...(scoped.data?[ "--env","LUMICSEC_BROKER_SCOPED="+
+        JSON.stringify(scoped.data) ]:[]),
       "--entrypoint","/usr/bin/node",IMAGE,"/opt/lumicsec-runtime/broker.mjs",
     ];
     container=spawn("docker",args,{env:limitedEnv,stdio:["ignore","pipe","pipe"]});

@@ -19,6 +19,10 @@ type Plan={
 };
 type PlanEvent={id:number;actor_id:string;event_type:string;details:{
  scopeSha256?:string;paths?:string[];expiresAt?:string;scanningEnabled?:boolean};created_at:string};
+type SavedFixtureExecution={id:string;plan_id:string;asset_id:string;
+ exact_origin:string;safe_profile:string;status:string;lease_generation:number;
+ result_count:number;scope_hash:string;created_at:string;
+ started_at:string|null;completed_at:string|null;error_code:string|null};
 type Check={eligibility:string;authorizedForPlanning:boolean;publicScanningEnabled:false;
  executionAllowed:false;scopeSha256:string};
 const inputClass="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-sm text-white";
@@ -65,6 +69,14 @@ export function AssessmentPlansPage(){
    "/v1/assessment-plans/events?organizationId="+encodeURIComponent(activeOrganizationId)
    +"&planId="+encodeURIComponent(selectedId)),
   enabled:Boolean(selectedId&&activeOrganizationId)});
+ const executionHistory=useQuery({
+  queryKey:["assessment-plan-fixture-executions",activeOrganizationId,selectedId],
+  queryFn:()=>getJson<{executions:SavedFixtureExecution[];scanningEnabled:false;
+    executionAllowed:false}>(
+   "/v1/assessment-plans/executions?organizationId="+encodeURIComponent(activeOrganizationId)
+    +"&planId="+encodeURIComponent(selectedId)),
+  enabled:Boolean(selectedId&&activeOrganizationId),
+ });
  const eligibility=useQuery({queryKey:["assessment-plan-check",activeOrganizationId,selectedId],
   queryFn:()=>getJson<{result:Check}>(
     "/v1/assessment-plans/check?organizationId="+encodeURIComponent(activeOrganizationId)
@@ -219,6 +231,27 @@ export function AssessmentPlansPage(){
      {history.data?.events.map(event=><p key={event.id} className="mt-2">
       {new Date(event.created_at).toLocaleString()} · {event.event_type} · actor {event.actor_id}</p>)}
      {history.isError?<p role="alert">{history.error.message}</p>:null}
+     <div className="mt-4 border-t border-white/10 pt-3">
+      <p className="font-semibold text-white">Controlled-fixture execution history (read-only)</p>
+      <p className="mt-1 text-slate-400">Only saved internal Docker fixture jobs may appear.
+       Customer network scanning remains disabled; creating a plan never starts execution.</p>
+      {executionHistory.isLoading?<p className="mt-2">Loading fixture job history…</p>:null}
+      {executionHistory.isError?<p role="alert" className="mt-2 text-rose-300">
+       {executionHistory.error.message}</p>:null}
+      {executionHistory.data?.executions.length===0?
+       <p className="mt-2 text-slate-400">No controlled fixture executions recorded for this plan.</p>:null}
+      {executionHistory.data?.executions.map(job=><div key={job.id}
+        className="mt-3 rounded-lg border border-white/10 p-3">
+       <div className="flex flex-wrap items-center gap-2">
+        <Badge>{job.status}</Badge><span>{job.safe_profile}</span>
+        <span>{job.result_count} saved review observations</span>
+       </div>
+       <p className="mt-1">Created {new Date(job.created_at).toLocaleString()}
+        {job.completed_at?" · Ended "+new Date(job.completed_at).toLocaleString():""}</p>
+       <p className="mt-1 break-all text-slate-500">Saved scope SHA-256: {job.scope_hash}</p>
+       {job.error_code?<p className="mt-1 text-amber-200">Failure code: {job.error_code}</p>:null}
+      </div>)}
+     </div>
     </div>:null}
     <p className="text-sm text-slate-300"><ShieldAlert size={16} className="mr-2 inline"/>
      This milestone creates and revokes plans, not scanner jobs. To see any existing qualified observations,

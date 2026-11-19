@@ -126,6 +126,9 @@ try{
             .waitFor({timeout:12_000});
           const save=page.getByRole("button",{name:"Authorize assessment plan (no scan)"});
           if(scenario==="viewer"){
+            await page.getByRole("button",{name:"Inspect audit and live eligibility"}).first().click();
+            await page.getByText("Controlled-fixture execution history (read-only)").waitFor();
+            await page.getByText("5 saved review observations").waitFor();
             if(!(await save.isDisabled()))throw Error("VIEWER_CAN_AUTHORIZE_PLAN");
             if(await page.getByRole("button",{name:"Revoke permission"}).count()!==0)
               throw Error("VIEWER_CAN_REVOKE_PLAN");
@@ -149,6 +152,7 @@ try{
             await page.getByText("Authorization saved. No network assessment was executed.").waitFor();
             await page.getByRole("button",{name:"Inspect audit and live eligibility"}).first().click();
             await page.getByText("Current proof check:").waitFor({timeout:12_000});
+            await page.getByText("No controlled fixture executions recorded for this plan.").waitFor({timeout:12_000});
             await page.getByText("ELIGIBLE_FOR_FUTURE_REVIEW").first().waitFor({timeout:12_000});
             if(scenario==="owner"){
               const revokes=page.getByRole("button",{name:"Revoke permission"});

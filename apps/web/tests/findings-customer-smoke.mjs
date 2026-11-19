@@ -116,6 +116,20 @@ const server=createServer(async(req,res)=>{
     if(path==="/v1/assessment-plans"&&req.method==="GET")
       return send(res,200,{plans:planState.plans,scanningEnabled:false,
        executionAllowed:false});
+    if(path==="/v1/assessment-plans/executions"&&req.method==="GET"){
+      const id=url.searchParams.get("planId");
+      const current=planState.plans.find(p=>p.id===id);
+      if(!current)return send(res,403,{error:"PLAN_NOT_VISIBLE"});
+      return send(res,200,{executions:id===seedPlan?[{
+        id:"00000000-0000-4000-8000-000000000055",
+        plan_id:id,organization_id:org,asset_id:asset,requested_by:actor,
+        scope_hash:current.scope_sha256,exact_origin:current.exact_origin,
+        safe_profile:"web_readonly",status:"succeeded",lease_generation:1,
+        result_count:5,created_at:"2026-11-19T02:30:00Z",
+        started_at:"2026-11-19T02:30:01Z",
+        completed_at:"2026-11-19T02:30:03Z",error_code:null,
+      }]:[],scanningEnabled:false,executionAllowed:false});
+    }
     if(path==="/v1/assessment-plans/events"&&req.method==="GET"){
       const id=url.searchParams.get("planId");
       if(!planState.plans.some(p=>p.id===id))
