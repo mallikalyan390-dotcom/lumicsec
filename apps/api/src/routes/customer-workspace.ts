@@ -76,7 +76,7 @@ export async function customerWorkspaceRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "AUTHENTICATION_REQUIRED" });
     }
     const { data, error } = await supabase.from("assets")
-      .select("id,organization_id,asset_kind,display_name,canonical_origin,verification_status,created_at")
+      .select("id,organization_id,asset_kind,display_name,canonical_origin,verification_status,verified_at,verification_expires_at,created_at")
       .eq("organization_id", parsed.data.organizationId)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -108,7 +108,7 @@ export async function customerWorkspaceRoutes(app: FastifyInstance) {
     }
 
     // A customer can register only a PENDING asset. Ownership verification
-    // is a separate milestone. This route NEVER invokes a network scanner.
+    // requires a separate time-limited DNS/HTTPS proof; this route NEVER scans.
     const { data, error } = await supabase.from("assets")
       .insert({
         organization_id: parsed.data.organizationId,
@@ -117,7 +117,7 @@ export async function customerWorkspaceRoutes(app: FastifyInstance) {
         canonical_origin: origin,
         created_by: request.authUser.id,
       })
-      .select("id,organization_id,asset_kind,display_name,canonical_origin,verification_status,created_at")
+      .select("id,organization_id,asset_kind,display_name,canonical_origin,verification_status,verified_at,verification_expires_at,created_at")
       .single();
 
     if (error || !data) {

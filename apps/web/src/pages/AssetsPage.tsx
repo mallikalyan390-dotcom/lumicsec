@@ -3,10 +3,12 @@ import { Building2, Globe2, LockKeyhole, Plus, ShieldAlert } from "lucide-react"
 import { useState, type FormEvent } from "react";
 import type { CustomerAsset, CustomerOrganization } from "@lumicsec/shared";
 import { Badge } from "../components/ui/Badge.js";
+import { AssetOwnershipPanel } from "../components/AssetOwnershipPanel.js";
 import { Button } from "../components/ui/Button.js";
 import { Card, CardContent, CardHeader } from "../components/ui/Card.js";
 import { Input } from "../components/ui/Input.js";
 import { getAssets, getAuthSession, getOrganizations, postJson } from "../lib/api.js";
+import { useOrganizationSelection } from "../lib/organization-selection.js";
 
 const fieldLabel = "mb-1.5 block text-xs font-medium text-slate-300";
 const selectClass =
@@ -20,19 +22,20 @@ export function AssetsPage() {
     queryFn: getOrganizations,
   });
 
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
+
   const [organizationName, setOrganizationName] = useState("");
   const [assetKind, setAssetKind] = useState<"website" | "api">("website");
   const [assetName, setAssetName] = useState("");
   const [assetOrigin, setAssetOrigin] = useState("");
 
   const organizations = organizationsQuery.data?.organizations ?? [];
-  const activeOrganizationId = selectedOrganizationId || organizations[0]?.id || "";
+  const { activeOrganizationId, selectOrganization } = useOrganizationSelection(organizations);
   const activeOrganization = organizations.find((org) => org.id === activeOrganizationId);
   const activeRole = organizationsQuery.data?.memberships.find(
     (membership) => membership.organization_id === activeOrganizationId,
   )?.member_role;
   const canRegisterAssets = activeRole === "owner" || activeRole === "admin" || activeRole === "analyst";
+  const canManageOwnership = activeRole === "owner" || activeRole === "admin";
 
   const assetsQuery = useQuery({
     queryKey: ["assets", activeOrganizationId],
@@ -48,7 +51,7 @@ export function AssetsPage() {
     ),
     onSuccess: async (result) => {
       setOrganizationName("");
-      setSelectedOrganizationId(result.organization.id);
+      selectOrganization(result.organization.id);
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
     },
   });
@@ -129,7 +132,7 @@ export function AssetsPage() {
                 id="organization-select"
                 className={selectClass}
                 value={activeOrganizationId}
-                onChange={(event) => setSelectedOrganizationId(event.target.value)}
+                onChange={(event) => selectOrganization(event.target.value)}
               >
                 {organizations.map((org) => (
                   <option key={org.id} value={org.id}>{org.display_name}</option>
@@ -276,6 +279,10 @@ export function AssetsPage() {
                     <p className="mt-2 text-xs text-slate-500">
                       {asset.asset_kind.toUpperCase()} · No automatic scan permission
                     </p>
+                    <AssetOwnershipPanel
+                      asset={asset} organizationId={activeOrganizationId}
+                      csrfToken={session.data?.csrfToken ?? ""} canManage={canManageOwnership}
+                    />
                   </div>
                 ))}
               </div>
@@ -287,9 +294,9 @@ export function AssetsPage() {
       <div className="flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-xs leading-6 text-amber-100">
         <LockKeyhole size={18} className="mt-0.5 shrink-0" />
         <p>
-          Register only assets you own or are authorized to assess. Ownership verification,
-          bounded scanner execution and customer-security reporting are separate gated
-          milestones; this page does not enable them.
+          Register only assets you own or have permission to verify. Ownership challenges
+          require independently observed DNS TXT or bounded HTTPS proof. Scanning, reporting,
+          and assessment authorization remain disabled until separately qualified.
         </p>
       </div>
     </div>

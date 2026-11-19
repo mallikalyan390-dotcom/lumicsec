@@ -1,6 +1,6 @@
 # LumicSec development progress
 
-Last reviewed: 2026-11-18 (Asia/Kolkata). Target branch: `main` only.
+Last reviewed: 2026-11-19 (Asia/Kolkata). Target branch: `main` only.
 
 ## Repository safeguards
 
@@ -9,6 +9,26 @@ Last reviewed: 2026-11-18 (Asia/Kolkata). Target branch: `main` only.
 - No extra branches or force pushes are permitted.
 - The original Web and API security repositories are read-only inputs.
 - No production deployment, paid cloud resources, billing activation or DNS changes are authorized.
+
+## CTO recovery and direct Data API RLS hardening (2026-11-19)
+
+Recovered exactly **26** uncommitted files (12 modified tracked, 14 previously untracked) on the founder's actual `/home/kalyan/lumicsec` working checkout at GitHub main `9ae1374c392905a7dc61a2146e7c189953e8e3d4`. No force/reset/re-clone, no change to existing verified MFA factors or production settings. The two named long-lived processes were investigated: the old Supabase CLI migration-new process was idle, with its generated migration already created and applied, and was terminated without database changes. The separately running browser smoke test fixture had valid 8/8 synthetic reports; founder frontend/API processes were retained.
+
+New forward-only **`20261119005151_require_google_totp_rls`** development migration adds a restrictive full Google OAuth+TOTP AAL2 JWT gate to **all six original tenant tables** (organizations, memberships, assets, assessment jobs, assessment observations, audit). The original RLS membership policies still apply and existing rows were preserved. The original tenant SQL suite and expanded RBAC/ownership SQL suite both passed again, with rollback and synthetic role-downgrade scenarios.
+
+Code qualification: frozen install, production build, ESLint, TypeScript, **178/178 automated tests** after an extra DNS stall test, production dependency audit, and **8/8 compiled UI synthetic scenarios** across Chromium/Firefox (team owner/member and asset owner/member). DNS verification has a 4-second absolute resolver deadline, HTTPS has a 5-second absolute deadline plus 4-second idle timeout. No live customer websites were queried, no scanning enabled. Vite still warns of a large (>500kB) bundle. The founder's server-only `SUPABASE_SECRET_KEY` is absent, so actual DNS/HTTPS completion **remains intentionally blocked at 503**. Do not claim real proof was verified or the complete commercial platform was launched. See `docs/MASTER_DEVELOPMENT_TRACKER.md` and `docs/security/asset-ownership-qualification.md`.
+
+## Current customer lifecycle checkpoint: Organization RBAC + Asset ownership (2026-11-19)
+
+The existing tenant/authentication foundation was preserved. Development Supabase migrations **20261118235406** (organization invitations, roles, asset challenges and strictly scoped RPCs) and **20261118235735** (forward-only PostgreSQL varchar/text correction) were applied successfully. New `organization_invitations` (deliberate deny-all RLS direct access) and `asset_verification_challenges` (manager-only RLS read) tables were added; no existing tenant row was overwritten. Invitation secrets and asset challenge tokens are stored SHA-256-hashed. Owner/Admin/Member roles are supported; legacy analyst/viewer rows remain valid and are not silently transformed.
+
+The 298-line rollback-only development SQL test `supabase/tests/rbac-ownership.sql` reported **ROLLBACK_ONLY_RBAC_OWNERSHIP_TESTS_PASS**, covering owner/admin/member access, last-owner protection, one-time email-bound invitation acceptance and expiry, AAL1/non-Google denial, wrong-tenant objects, expired/wrong asset proof, service-only proof finalization, and ownership revocation. This is actual PostgreSQL RLS evidence, not a mock. The test does not leave synthetic users/assets/invitations in the database.
+
+Fastify now includes guarded organization-management and ownership-verification endpoints, validated input, DB-enforced membership state changes and audit history. The customer-facing React UI has team management, invite issue/accept, organization switching, DNS TXT and HTTPS file challenge instructions, owner-only check/revocation and expiry display. The new transport uses public IP validation across all A/AAAA DNS answers, pinned HTTPS TLS/SNI, strict no redirects, short timeouts and bounded response sizes; tests use synthetic DNS/HTTPS only. No scanner invocation was introduced.
+
+**Local blocking configuration:** The founder's active `.env` does not include `SUPABASE_SECRET_KEY`. Ownership completion is intentionally restricted to a server-only service-role RPC. Without securely provisioned credentials, local proof `/check` returns **503**, never a verified result. No real customer/public domain proof was accessed. API/browser tests for this route are synthetic and do not imply hosted verification success. Manual single-use invite code exchange works; automatic invitation email delivery is pending.
+
+Security advisor now reports expected INFO `rls_enabled_no_policy` for a deliberately deny-all invitation table; existing WARNING `auth_leaked_password_protection` remains. The Vite bundle chunk-size performance warning remains. See `docs/security/asset-ownership-qualification.md` and `docs/MASTER_DEVELOPMENT_TRACKER.md` for details, exact remaining acceptance gates, and the full commercial roadmap.
 
 ## Immediate CI repair
 

@@ -22,7 +22,8 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
   const navItems = [
     { to: "/app", label: "Overview", icon: LayoutDashboard, end: true },
     { to: "/app/api-security", label: "API Security", icon: FileSearch, end: false },
-    { to: "/app/assets", label: "Assets & organizations", icon: Globe2, end: false },
+    { to: "/app/assets", label: "Assets & ownership", icon: Globe2, end: false },
+    { to: "/app/organizations", label: "Team & organization", icon: ShieldCheck, end: false },
     { to: "/app/account-security", label: "Account security", icon: LockKeyhole, end: false },
   ];
 
@@ -79,6 +80,7 @@ export function AppShell({ session, children }: { session: AuthSessionResponse; 
           <NavLink to="/app" end className="rounded-lg border border-white/10 px-3 py-2">Overview</NavLink>
           <NavLink to="/app/api-security" className="rounded-lg border border-white/10 px-3 py-2">API Security</NavLink>
           <NavLink to="/app/assets" className="rounded-lg border border-white/10 px-3 py-2">Assets</NavLink>
+          <NavLink to="/app/organizations" className="rounded-lg border border-white/10 px-3 py-2">Team</NavLink>
           <NavLink to="/app/account-security" className="rounded-lg border border-white/10 px-3 py-2">Account security</NavLink>
         </nav>
         <main className="mx-auto max-w-7xl p-5 sm:p-8">{children}</main>

@@ -69,7 +69,7 @@ export interface CustomerOrganization {
 
 export interface CustomerMembership {
   organization_id: string;
-  member_role: "owner" | "admin" | "analyst" | "viewer";
+  member_role: "owner" | "admin" | "member" | "analyst" | "viewer";
   member_status: "active" | "suspended";
 }
 
@@ -80,6 +80,8 @@ export interface CustomerAsset {
   display_name: string;
   canonical_origin: string;
   verification_status: "pending" | "verified" | "revoked";
+  verified_at: string | null;
+  verification_expires_at: string | null;
   created_at: string;
 }
 

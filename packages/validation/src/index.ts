@@ -33,3 +33,30 @@ export const assetCreateSchema = z.object({
 
 export type OrganizationCreateRequest = z.infer<typeof organizationCreateSchema>;
 export type AssetCreateRequest = z.infer<typeof assetCreateSchema>;
+
+
+// Organization RBAC and asset-proof inputs. Unknown fields are rejected.
+export const organizationPathSchema = z.object({ organizationId: z.uuid() }).strict();
+export const invitationPathSchema = organizationPathSchema.extend({ invitationId: z.uuid() }).strict();
+export const memberPathSchema = organizationPathSchema.extend({ userId: z.uuid() }).strict();
+export const organizationInviteSchema = z.object({
+  email: z.email().max(254).transform((email) => email.trim().toLowerCase()),
+  role: z.enum(["admin", "member"]),
+}).strict();
+export const invitationAcceptSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+export const memberRoleSchema = z.object({
+  role: z.enum(["owner", "admin", "member"]),
+}).strict();
+export const assetVerificationIssueSchema = z.object({
+  organizationId: z.uuid(), assetId: z.uuid(),
+  method: z.enum(["dns_txt", "https_file"]),
+}).strict();
+export const assetVerificationCheckSchema = z.object({
+  organizationId: z.uuid(), assetId: z.uuid(), challengeId: z.uuid(),
+}).strict();
+export const assetVerificationRevokeSchema = z.object({
+  organizationId: z.uuid(), assetId: z.uuid(),
+}).strict();
+export const assetVerificationListSchema = assetVerificationRevokeSchema;

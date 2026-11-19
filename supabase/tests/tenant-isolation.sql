@@ -14,7 +14,7 @@ VALUES
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000101', true);
 SELECT set_config('request.jwt.claims',
- '{"sub":"00000000-0000-4000-8000-000000000101","aal":"aal2","app_metadata":{"provider":"google"}}',
+ '{"sub":"00000000-0000-4000-8000-000000000101","aal":"aal2","app_metadata":{"provider":"google"},"amr":[{"method":"oauth"},{"method":"totp"}]}',
  true);
 
 INSERT INTO public.organizations (display_name, created_by)
@@ -45,7 +45,7 @@ END $$;
 -- Switch to a second, unrelated Google AAL2 user.
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000102', true);
 SELECT set_config('request.jwt.claims',
- '{"sub":"00000000-0000-4000-8000-000000000102","aal":"aal2","app_metadata":{"provider":"google"}}',
+ '{"sub":"00000000-0000-4000-8000-000000000102","aal":"aal2","app_metadata":{"provider":"google"},"amr":[{"method":"oauth"},{"method":"totp"}]}',
  true);
 
 DO $$
@@ -124,3 +124,4 @@ END $$;
 
 -- Tests are intentionally non-persistent; nothing may survive.
 ROLLBACK;
+SELECT 'ROLLBACK_ONLY_TENANT_RLS_TESTS_PASS' AS test_result;

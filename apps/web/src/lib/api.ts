@@ -70,3 +70,63 @@ export type VerifiedTotpFactorsResponse = { verifiedTotpFactors: VerifiedTotpFac
 export function getVerifiedTotpFactors() {
   return requestJson<VerifiedTotpFactorsResponse>("/auth/mfa/factors");
 }
+
+export type OrganizationRole = "owner" | "admin" | "member" | "analyst" | "viewer";
+export type OrganizationMember = {
+  user_id: string;
+  member_role: OrganizationRole;
+  member_status: "active" | "suspended";
+  member_email: string;
+  joined_at: string;
+};
+export type OrganizationInvite = {
+  id: string;
+  invite_email: string;
+  invite_role: "admin" | "member";
+  expires_at: string;
+  created_at: string;
+  invite_status: "pending" | "expired" | "revoked" | "accepted";
+};
+export type OrganizationAuditEvent = {
+  id: number;
+  actor_id: string | null;
+  action: string;
+  event_summary: string;
+  created_at: string;
+};
+
+export function getOrganizationMembers(organizationId: string) {
+  return requestJson<{ members: OrganizationMember[] }>(
+    "/v1/organizations/" + encodeURIComponent(organizationId) + "/members");
+}
+export function getOrganizationInvitations(organizationId: string) {
+  return requestJson<{ invitations: OrganizationInvite[] }>(
+    "/v1/organizations/" + encodeURIComponent(organizationId) + "/invitations");
+}
+export function getOrganizationAudit(organizationId: string) {
+  return requestJson<{ events: OrganizationAuditEvent[] }>(
+    "/v1/organizations/" + encodeURIComponent(organizationId) + "/audit");
+}
+
+export type AssetVerificationChallenge = {
+  id: string;
+  organization_id: string;
+  asset_id: string;
+  method: "dns_txt" | "https_file";
+  created_at: string;
+  expires_at: string;
+  verified_at: string | null;
+  revoked_at: string | null;
+};
+export type NewAssetChallenge = {
+  challenge_id: string;
+  verification_token: string;
+  verification_host: string;
+  verification_path: string;
+  expires_at: string;
+};
+export function getAssetVerificationChallenges(organizationId: string, assetId: string) {
+  return requestJson<{ challenges: AssetVerificationChallenge[] }>(
+    "/v1/assets/verification/challenges?organizationId="
+    + encodeURIComponent(organizationId) + "&assetId=" + encodeURIComponent(assetId));
+}
