@@ -15,6 +15,12 @@ const job="00000000-0000-4000-8000-000000000044";
 const findingId="00000000-0000-4000-8000-000000000055";
 const observation="00000000-0000-4000-8000-000000000066";
 const fingerprint="c".repeat(64);
+const runtimeCaptured=JSON.parse(await readFile(new URL(
+  "./controlled-runtime-actual-results.json",import.meta.url),"utf8"));
+const apiActual=runtimeCaptured.fixtures.api_insecure.result;
+const apiObservation=apiActual.observations.find(x=>x.ruleId==="API.RUNTIME.AUTH.ANON_SUCCESS");
+if(!apiObservation)throw Error("ACTUAL_API_RUNTIME_EVIDENCE_MISSING");
+
 const stateByRole=new Map();
 const actions=[];
 let importCount=0,exportPdfCount=0,exportJsonCount=0,webScanCount=0;
@@ -52,9 +58,24 @@ const server=createServer(async(req,res)=>{
     const role=cookies.includes("synthetic_role=viewer")?"viewer":
       cookies.includes("synthetic_role=analyst")?"analyst":"owner";
     const unverified=cookies.includes("synthetic_status=unverified");
-    const state=roleState(role);
-    const assetRow={id:asset,organization_id:org,asset_kind:"website",
-      display_name:"Synthetic reviewed HTTPS asset",canonical_origin:"https://synthetic.fixture-web.net",
+    const apiMode=cookies.includes("synthetic_runtime=api");
+    const state=roleState(role+(apiMode?"-runtime":""));
+    if(apiMode){
+      state.finding.assessment_kind="api_runtime_review";
+      state.finding.rule_id=apiObservation.ruleId;
+      state.finding.title=apiObservation.title;
+      state.finding.summary=apiObservation.summary;
+      state.finding.remediation=apiObservation.remediation;
+      state.finding.source_classification=apiObservation.classification;
+      state.finding.severity_estimate=apiObservation.severityEstimate;
+      state.finding.source_locator="/v1/accounts/owner";
+      state.finding.first_job_id=apiActual.jobId;
+      state.links[0].job_id=apiActual.jobId;
+      state.links[0].evidence_source=apiObservation.evidenceSource;
+    }
+    const assetRow={id:asset,organization_id:org,asset_kind:apiMode?"api":"website",
+      display_name:apiMode?"Controlled API review asset":"Synthetic reviewed HTTPS asset",
+      canonical_origin:apiMode?"https://controlled-api.fixture-api.net":"https://synthetic.fixture-web.net",
       verification_status:unverified?"pending":"verified",
       verification_expires_at:unverified?null:"2099-01-01T00:00:00Z"};
     if(path==="/auth/session")return send(res,200,{configured:true,state:"authenticated",
@@ -136,9 +157,12 @@ const server=createServer(async(req,res)=>{
     const headers={"content-type":mime[extname(file)]??"application/octet-stream","cache-control":"no-store"};
     if(file.endsWith(".html") && (path==="/app/findings"||path==="/")){
       // Reset only this synthetic role fixture between independent browser runs.
-      stateByRole.delete(url.searchParams.get("role")??"owner");
+      stateByRole.delete((url.searchParams.get("role")??"owner")+
+        (url.searchParams.get("runtime")==="api"?"-runtime":""));
       headers["set-cookie"]=[
         "synthetic_role="+(url.searchParams.get("role")??"owner")+"; Path=/; SameSite=Lax",
+        "synthetic_runtime="+(url.searchParams.get("runtime")==="api"?"api":"web")+
+          "; Path=/; SameSite=Lax",
         "synthetic_status="+(url.searchParams.get("mode")==="unverified"?"unverified":"verified")
           +"; Path=/; SameSite=Lax",
       ];

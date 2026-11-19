@@ -1,0 +1,328 @@
+{
+  "disclosure": "Actual synthetic HTTPS results, not customer data or verified vulnerabilities.",
+  "generatedAt": "2026-11-19T05:27:06.807Z",
+  "fixtures": {
+    "api_insecure": {
+      "result": {
+        "protocol": "CONTROLLED_RUNTIME_V1",
+        "type": "RESULT",
+        "executionId": "f8dc75a3-b350-4d6f-b3a7-7029d8f87c43",
+        "jobId": "b4e6525f-9cb8-4eec-b00e-cf77e65db6c9",
+        "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mode": "api",
+        "report": {
+          "classification": "RUNTIME_API_REVIEW",
+          "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "coverageState": "BOUNDED",
+          "requests": 3,
+          "bytes": 138,
+          "limitations": [
+            "Three bounded GET requests to one controlled object only.",
+            "All identities and account content synthetic; no customer credentials.",
+            "Successful responses are review signals, not proven data exposure.",
+            "Not observed never proves general API security.",
+            "Authentication and authorization policy inferred from explicit controlled fixture expectation."
+          ],
+          "statuses": {
+            "anonymous": 200,
+            "owner": 200,
+            "other": 200
+          }
+        },
+        "observations": [
+          {
+            "ruleId": "API.RUNTIME.AUTH.ANON_SUCCESS",
+            "title": "Anonymous protected-route response",
+            "summary": "Controlled protected resource responded successfully without synthetic identity.",
+            "remediation": "Require server-side authentication for every protected object.",
+            "limitation": "Synthetic read-only response comparison; no confirmed exploit or generalizable authorization verdict.",
+            "classification": "INCONCLUSIVE",
+            "severityEstimate": "medium",
+            "evidenceSource": {
+              "paths": [
+                "/v1/accounts/owner"
+              ],
+              "fingerprints": [
+                "7c26c4182a2021b59d7933aebff8c60a3649030782c714655d34525bfa8ede92",
+                "1d7aa661da27010ff599df504f72f144cbd81d4f3d19bb9768106742ad716f48",
+                "81eb779bfdc152c8a300068a143c4d62399987eb28a78965ca8b19d9a0294a3e"
+              ],
+              "nodeIds": [
+                "wdn_6f0b6892db5db7025d8fb0ea"
+              ]
+            }
+          },
+          {
+            "ruleId": "API.RUNTIME.AUTHZ.OTHER_SUCCESS",
+            "title": "Synthetic cross-identity response",
+            "summary": "The same controlled owner object responded successfully for the other synthetic identity.",
+            "remediation": "Enforce object ownership checks on every protected resource.",
+            "limitation": "Synthetic read-only response comparison; no confirmed exploit or generalizable authorization verdict.",
+            "classification": "INCONCLUSIVE",
+            "severityEstimate": "medium",
+            "evidenceSource": {
+              "paths": [
+                "/v1/accounts/owner"
+              ],
+              "fingerprints": [
+                "7c26c4182a2021b59d7933aebff8c60a3649030782c714655d34525bfa8ede92",
+                "1d7aa661da27010ff599df504f72f144cbd81d4f3d19bb9768106742ad716f48",
+                "81eb779bfdc152c8a300068a143c4d62399987eb28a78965ca8b19d9a0294a3e"
+              ],
+              "nodeIds": [
+                "wdn_6f0b6892db5db7025d8fb0ea"
+              ]
+            }
+          },
+          {
+            "ruleId": "API.RUNTIME.HEADER.HSTS_ABSENT",
+            "title": "Missing HSTS response policy",
+            "summary": "Controlled HTTPS resource did not return a Strict-Transport-Security header.",
+            "remediation": "Review and configure an appropriate HSTS policy.",
+            "limitation": "Synthetic read-only response comparison; no confirmed exploit or generalizable authorization verdict.",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "severityEstimate": "low",
+            "evidenceSource": {
+              "paths": [
+                "/v1/accounts/owner"
+              ],
+              "fingerprints": [
+                "7c26c4182a2021b59d7933aebff8c60a3649030782c714655d34525bfa8ede92",
+                "1d7aa661da27010ff599df504f72f144cbd81d4f3d19bb9768106742ad716f48",
+                "81eb779bfdc152c8a300068a143c4d62399987eb28a78965ca8b19d9a0294a3e"
+              ],
+              "nodeIds": [
+                "wdn_6f0b6892db5db7025d8fb0ea"
+              ]
+            }
+          },
+          {
+            "ruleId": "API.RUNTIME.HEADER.NOSNIFF_ABSENT",
+            "title": "Missing nosniff protection",
+            "summary": "Controlled API resource did not return X-Content-Type-Options: nosniff.",
+            "remediation": "Add the nosniff response header.",
+            "limitation": "Synthetic read-only response comparison; no confirmed exploit or generalizable authorization verdict.",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "severityEstimate": "low",
+            "evidenceSource": {
+              "paths": [
+                "/v1/accounts/owner"
+              ],
+              "fingerprints": [
+                "7c26c4182a2021b59d7933aebff8c60a3649030782c714655d34525bfa8ede92",
+                "1d7aa661da27010ff599df504f72f144cbd81d4f3d19bb9768106742ad716f48",
+                "81eb779bfdc152c8a300068a143c4d62399987eb28a78965ca8b19d9a0294a3e"
+              ],
+              "nodeIds": [
+                "wdn_6f0b6892db5db7025d8fb0ea"
+              ]
+            }
+          }
+        ]
+      },
+      "requests": 3,
+      "bytes": 138,
+      "externalRequests": 0,
+      "classification": "CONTROLLED_SYNTHETIC_FIXTURE_ONLY"
+    },
+    "api_secure": {
+      "result": {
+        "protocol": "CONTROLLED_RUNTIME_V1",
+        "type": "RESULT",
+        "executionId": "4929e27f-2b3b-4925-a504-dd0b0f8f901f",
+        "jobId": "dfe28062-0e96-4a9c-8467-ff1fafd20b7e",
+        "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mode": "api",
+        "report": {
+          "classification": "RUNTIME_API_REVIEW",
+          "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "coverageState": "BOUNDED",
+          "requests": 3,
+          "bytes": 103,
+          "limitations": [
+            "Three bounded GET requests to one controlled object only.",
+            "All identities and account content synthetic; no customer credentials.",
+            "Successful responses are review signals, not proven data exposure.",
+            "Not observed never proves general API security.",
+            "Authentication and authorization policy inferred from explicit controlled fixture expectation."
+          ],
+          "statuses": {
+            "anonymous": 401,
+            "owner": 200,
+            "other": 403
+          }
+        },
+        "observations": []
+      },
+      "requests": 3,
+      "bytes": 103,
+      "externalRequests": 0,
+      "classification": "CONTROLLED_SYNTHETIC_FIXTURE_ONLY"
+    },
+    "web_insecure": {
+      "result": {
+        "protocol": "CONTROLLED_RUNTIME_V1",
+        "type": "RESULT",
+        "executionId": "464b2450-8999-4f51-bad7-cbe877673d52",
+        "jobId": "32aaaa71-9d34-4fb8-998b-30affbda95c7",
+        "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mode": "web",
+        "report": {
+          "classification": "PASSIVE_WEB_REVIEW",
+          "analysisVersion": "web-assessment-analysis-v1",
+          "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "snapshotFingerprint": "12887df18a8c826fc1fc85b0553c65c94402573e4af165abaede1be518f6edbe",
+          "requests": 1,
+          "fetched": 1,
+          "bytes": 56,
+          "failed": 0,
+          "coverageState": "BOUNDED",
+          "candidateCount": 2,
+          "observationCount": 5,
+          "limitations": [
+            "Passive observations, not confirmed vulnerabilities.",
+            "Credential-free GET-only within a bounded isolated execution namespace."
+          ]
+        },
+        "observations": [
+          {
+            "ruleId": "P09.CSP.ABSENT",
+            "title": "No enforced Content Security Policy on observed HTML response",
+            "summary": "The fully captured response lacks an enforced CSP; this does not prove XSS.",
+            "remediation": "Introduce and validate a restrictive policy incrementally, using report-only during rollout.",
+            "limitation": "Passive evidence only; exploitability and whole-site coverage unverified.",
+            "severityEstimate": "info",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "evidenceSource": {
+              "nodeIds": [
+                "wdn_397e2fa22e0d651dfe339823"
+              ],
+              "fingerprints": [
+                "78d4443b74091ada8a1cb6a67e0cc766bced4dd730ecbc52570c48d193ffc3a5"
+              ],
+              "paths": [
+                "/"
+              ]
+            }
+          },
+          {
+            "ruleId": "P09.FRAME.NO_POLICY",
+            "title": "Observed HTML response has no framing policy",
+            "summary": "Neither X-Frame-Options nor enforced CSP frame-ancestors was captured; this is not clickjacking proof.",
+            "remediation": "Consider frame-ancestors in enforced CSP or X-Frame-Options according to compatibility.",
+            "limitation": "Passive evidence only; exploitability and whole-site coverage unverified.",
+            "severityEstimate": "low",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "evidenceSource": {
+              "nodeIds": [
+                "wdn_397e2fa22e0d651dfe339823"
+              ],
+              "fingerprints": [
+                "78d4443b74091ada8a1cb6a67e0cc766bced4dd730ecbc52570c48d193ffc3a5"
+              ],
+              "paths": [
+                "/"
+              ]
+            }
+          },
+          {
+            "ruleId": "P09.XCTO.CONFIG",
+            "title": "MIME sniffing defense needs review",
+            "summary": "The observed response did not include an effective X-Content-Type-Options: nosniff value.",
+            "remediation": "Consider X-Content-Type-Options: nosniff with correct Content-Type.",
+            "limitation": "Passive evidence only; exploitability and whole-site coverage unverified.",
+            "severityEstimate": "low",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "evidenceSource": {
+              "nodeIds": [
+                "wdn_397e2fa22e0d651dfe339823"
+              ],
+              "fingerprints": [
+                "78d4443b74091ada8a1cb6a67e0cc766bced4dd730ecbc52570c48d193ffc3a5"
+              ],
+              "paths": [
+                "/"
+              ]
+            }
+          },
+          {
+            "ruleId": "P09.COOKIE.SECURE_AGG",
+            "title": "Observed cookie attributes need Secure review",
+            "summary": "At least one observed Set-Cookie entry lacks Secure in an aggregate; cookie purpose is unknown.",
+            "remediation": "Classify cookie purpose, and enforce Secure on cookies that must only travel over HTTPS.",
+            "limitation": "Passive evidence only; exploitability and whole-site coverage unverified.",
+            "severityEstimate": "low",
+            "classification": "PASSIVE_OBSERVATION",
+            "evidenceSource": {
+              "nodeIds": [
+                "wdn_397e2fa22e0d651dfe339823"
+              ],
+              "fingerprints": [
+                "78d4443b74091ada8a1cb6a67e0cc766bced4dd730ecbc52570c48d193ffc3a5"
+              ],
+              "paths": [
+                "/"
+              ]
+            }
+          },
+          {
+            "ruleId": "P09.HSTS.ABSENT",
+            "title": "HSTS header absent on observed HTTPS response",
+            "summary": "A complete captured response header set did not include HSTS; this is a hardening signal, not proof of downgrade exploitation.",
+            "remediation": "Evaluate enabling Strict-Transport-Security with a tested max-age on HTTPS.",
+            "limitation": "Passive evidence only; exploitability and whole-site coverage unverified.",
+            "severityEstimate": "low",
+            "classification": "DETERMINISTIC_CONFIGURATION_SIGNAL",
+            "evidenceSource": {
+              "nodeIds": [
+                "wdn_397e2fa22e0d651dfe339823"
+              ],
+              "fingerprints": [
+                "78d4443b74091ada8a1cb6a67e0cc766bced4dd730ecbc52570c48d193ffc3a5"
+              ],
+              "paths": [
+                "/"
+              ]
+            }
+          }
+        ]
+      },
+      "requests": 1,
+      "bytes": 56,
+      "externalRequests": 0,
+      "classification": "CONTROLLED_SYNTHETIC_FIXTURE_ONLY"
+    },
+    "web_secure": {
+      "result": {
+        "protocol": "CONTROLLED_RUNTIME_V1",
+        "type": "RESULT",
+        "executionId": "4b13f19c-078e-4c31-b147-d0975ada0e93",
+        "jobId": "e8f72ce4-d474-40c0-a69b-cf7778609d99",
+        "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mode": "web",
+        "report": {
+          "classification": "PASSIVE_WEB_REVIEW",
+          "analysisVersion": "web-assessment-analysis-v1",
+          "scopeHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "snapshotFingerprint": "4f2d9d9be879d8d79226fb38cbf0ba29331c063ddad54892e56ded6ed96210b2",
+          "requests": 1,
+          "fetched": 1,
+          "bytes": 56,
+          "failed": 0,
+          "coverageState": "BOUNDED",
+          "candidateCount": 0,
+          "observationCount": 0,
+          "limitations": [
+            "Passive observations, not confirmed vulnerabilities.",
+            "Credential-free GET-only within a bounded isolated execution namespace."
+          ]
+        },
+        "observations": []
+      },
+      "requests": 1,
+      "bytes": 56,
+      "externalRequests": 0,
+      "classification": "CONTROLLED_SYNTHETIC_FIXTURE_ONLY"
+    }
+  }
+}

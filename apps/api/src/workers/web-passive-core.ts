@@ -18,7 +18,7 @@ export type UnprivilegedWebResult = Readonly<{
 }>;
 
 export async function executeUnprivilegedWebRead(input: Readonly<{
-  scope: UnprivilegedWebScope; transport?: PublicPinnedWebTransport; signal: AbortSignal;
+  scope: UnprivilegedWebScope; transport?: Pick<PublicPinnedWebTransport, "read">; signal: AbortSignal;
 }>): Promise<UnprivilegedWebResult> {
   const { scope, signal } = input;
   if (signal.aborted || !/^[a-f0-9]{64}$/.test(scope.scopeHash))

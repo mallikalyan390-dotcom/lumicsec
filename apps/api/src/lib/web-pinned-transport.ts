@@ -54,6 +54,9 @@ export function isPublicWebAddress(address: string, family: number): boolean {
 export function requireExactWebUrl(candidate: string, origin: string, method: "GET" | "HEAD" = "GET") {
   if (candidate.length > 2048 || candidate.includes("\\") ||
     [...candidate].some(ch => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127)) fail("WEB_URL_UNSAFE");
+  // Reject encoded traversal before URL normalization collapses dot segments.
+  if (/%(?:2e|2f|5c|25|00|0[ad])/i.test(candidate) ||
+    /\/\.\.?(?:\/|$)/.test(candidate)) fail("WEB_PATH_BLOCKED");
   let url: URL; let scope: URL;
   try { url = new URL(candidate); scope = new URL(origin); }
   catch { return fail("WEB_URL_INVALID"); }

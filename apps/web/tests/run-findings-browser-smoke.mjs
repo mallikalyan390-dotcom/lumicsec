@@ -1,5 +1,6 @@
 // Real compiled React + Playwright Chromium/Firefox. No public network.
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { setTimeout as pause } from "node:timers/promises";
 import process from "node:process";
@@ -8,6 +9,11 @@ const fetch=globalThis.fetch;
 const require=createRequire("/opt/lumicsec-phase14/package.json");
 const playwright=require("playwright-core");
 const base="http://127.0.0.1:5195";
+const runtimeEvidence=JSON.parse(readFileSync(
+  "/opt/fixture/tests/controlled-runtime-actual-results.json","utf8"));
+const actualApi=runtimeEvidence.fixtures.api_insecure.result.observations.find(
+  x=>x.ruleId==="API.RUNTIME.AUTH.ANON_SUCCESS");
+if(!actualApi)throw Error("RUNTIME_BROWSER_EVIDENCE_MISSING");
 const server=spawn("/usr/bin/node",["/opt/fixture/tests/findings-customer-smoke.mjs"],{
   env:{PATH:"/usr/bin:/bin",HOME:"/tmp"},stdio:["ignore","pipe","pipe"],
 });
@@ -87,13 +93,31 @@ try{
           completed++;
         }finally{await context.close();}
       }
+      // Separate API-runtime saved-evidence review, sourced from actual
+      // network-none Docker + TLS output, not invented customer findings.
+      const context=await browser.newContext({acceptDownloads:true,viewport:{width:1280,height:900}});
+      try{
+        const page=await context.newPage();
+        await page.goto(base+"/app/findings?role=owner&runtime=api",
+          {waitUntil:"domcontentloaded",timeout:20_000});
+        await page.getByText("Anonymous protected-route response").first().waitFor({timeout:16_000});
+        await page.getByText("API.RUNTIME.AUTH.ANON_SUCCESS").first().waitFor({timeout:16_000});
+        await page.getByRole("button",{name:"Review finding"}).click();
+        await page.getByText(actualApi.evidenceSource.fingerprints[0],{exact:false})
+          .first().waitFor({timeout:12_000});
+        await page.getByText("INCONCLUSIVE",{exact:false}).first().waitFor({timeout:12_000});
+        const stats=await status();
+        if(stats.webScanCount!==0)throw Error("RUNTIME_BROWSER_STARTED_PUBLIC_SCAN");
+        process.stdout.write("FINDINGS_"+browserName.toUpperCase()+"_SAVED_API_RUNTIME_PASS\n");
+        completed++;
+      }finally{await context.close();}
     }finally{await browser.close();}
   }
   const current=await status();
-  if(completed!==8||current.webScanCount!==0||current.exportPdfCount<1||
+  if(completed!==10||current.webScanCount!==0||current.exportPdfCount<1||
      current.exportJsonCount<1||!current.actions.some(x=>x.action==="retest_request"))
     throw Error("FINDINGS_BROWSER_WORKFLOW_INCOMPLETE");
-  process.stdout.write("FINDINGS_CHROMIUM_FIREFOX_8_OF_8_PASS\n");
+  process.stdout.write("FINDINGS_CHROMIUM_FIREFOX_10_OF_10_PASS\n");
 }catch(error){
   process.stderr.write("FINDINGS_BROWSER_NOT_QUALIFIED:"+String(error).slice(0,700)+"\n");
   process.exitCode=1;

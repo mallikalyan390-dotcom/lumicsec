@@ -20,7 +20,10 @@
     "build:isolated-web": "pnpm --filter @lumicsec/api build:isolated-web",
     "test:isolated-web": "pnpm build:isolated-web && pnpm --filter @lumicsec/api test:sandbox",
     "test:web-browsers": "node apps/web/tests/run-isolated-browser-docker.mjs",
-    "test:findings-browsers": "node apps/web/tests/run-findings-browser-docker.mjs"
+    "test:findings-browsers": "node apps/web/tests/run-findings-browser-docker.mjs",
+    "build:controlled-runtime": "pnpm --filter @lumicsec/api build:controlled-runtime",
+    "test:controlled-runtime": "pnpm build:controlled-runtime && pnpm --filter @lumicsec/api test:controlled-runtime",
+    "capture:controlled-runtime": "pnpm build:controlled-runtime && pnpm --filter @lumicsec/api capture:controlled-runtime"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

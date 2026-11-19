@@ -17,6 +17,7 @@ const targets = [
   [join(root,"dist"),"/opt/fixture/dist"],
   [join(tests,"findings-customer-smoke.mjs"),"/opt/fixture/tests/findings-customer-smoke.mjs"],
   [join(tests,"run-findings-browser-smoke.mjs"),"/opt/fixture/tests/run-findings-browser-smoke.mjs"],
+  [resolve(root,"../api/tests/fixtures/controlled-runtime-actual-results.json"),"/opt/fixture/tests/controlled-runtime-actual-results.json"],
 ];
 const name="lumicsec-ui-"+randomUUID();
 const args = [

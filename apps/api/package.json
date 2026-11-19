@@ -9,7 +9,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build:isolated-web": "node scripts/build-isolated-web-worker.mjs",
-    "test:sandbox": "LUMICSEC_RUN_DOCKER_SANDBOX=1 vitest run tests/web-isolated-container.test.ts"
+    "test:sandbox": "LUMICSEC_RUN_DOCKER_SANDBOX=1 vitest run tests/web-isolated-container.test.ts",
+    "build:controlled-runtime": "node scripts/build-controlled-runtime-worker.mjs",
+    "test:controlled-runtime": "LUMICSEC_RUN_CONTROLLED_RUNTIME=1 vitest run tests/controlled-runtime-container.test.ts",
+    "capture:controlled-runtime": "node --import tsx scripts/capture-controlled-runtime-fixtures.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
