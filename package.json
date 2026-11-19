@@ -19,7 +19,8 @@
     "security:audit": "pnpm audit --prod --audit-level high",
     "build:isolated-web": "pnpm --filter @lumicsec/api build:isolated-web",
     "test:isolated-web": "pnpm build:isolated-web && pnpm --filter @lumicsec/api test:sandbox",
-    "test:web-browsers": "node apps/web/tests/run-isolated-browser-docker.mjs"
+    "test:web-browsers": "node apps/web/tests/run-isolated-browser-docker.mjs",
+    "test:findings-browsers": "node apps/web/tests/run-findings-browser-docker.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

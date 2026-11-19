@@ -12,6 +12,7 @@ import { organizationManagementRoutes } from "./routes/organization-management.j
 import { assetVerificationRoutes } from "./routes/asset-verification.js";
 import { offlineAssessmentRoutes } from "./routes/offline-assessments.js";
 import { authorizedWebAssessmentRoutes } from "./routes/web-assessments.js";
+import { commercialFindingsRoutes } from "./routes/commercial-findings.js";
 
 export function buildApp() {
   const app = Fastify({
@@ -66,6 +67,7 @@ export function buildApp() {
   app.register(assetVerificationRoutes);
   app.register(offlineAssessmentRoutes);
   app.register(authorizedWebAssessmentRoutes);
+  app.register(commercialFindingsRoutes);
 
   app.setNotFoundHandler(async (_request, reply) => {
     return reply.code(404).send({ error: "NOT_FOUND" });
