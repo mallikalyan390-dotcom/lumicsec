@@ -26,7 +26,9 @@
     "capture:controlled-runtime": "pnpm build:controlled-runtime && pnpm --filter @lumicsec/api capture:controlled-runtime",
     "build:confined-broker": "pnpm --filter @lumicsec/api build:confined-broker",
     "test:confined-broker": "pnpm build:controlled-runtime && pnpm build:confined-broker && pnpm --filter @lumicsec/api test:confined-broker",
-    "test:authorized-plan-fixture": "pnpm build:controlled-runtime && pnpm build:confined-broker && pnpm --filter @lumicsec/api test:authorized-plan-fixture"
+    "test:authorized-plan-fixture": "pnpm build:controlled-runtime && pnpm build:confined-broker && pnpm --filter @lumicsec/api test:authorized-plan-fixture",
+    "test:restricted-egress": "pnpm build:controlled-runtime && pnpm build:confined-broker && pnpm --filter @lumicsec/api test:restricted-egress",
+    "test:broker-ticket-docker": "pnpm build:confined-broker && pnpm --filter @lumicsec/api test:broker-ticket-docker"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

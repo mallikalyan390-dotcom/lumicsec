@@ -129,6 +129,8 @@ only("real signed-plan controller plus independently confined Web/API Docker",()
     },bundlePath:bundle,brokerIsolation:"confined_fixture",
     planScope:{approvedPaths:["/v1/health"],maxRequests:3,
       maxResponseBytes:60000,maxTotalBytes:240000,maxExecutionMs:15000},
+    brokerClaim:{planId,workerId,generation:1,
+      notAfterMs:Date.now()+60000},
     signal:source.signal,
   })).rejects.toThrow();
   expect(fixture.completed).toHaveLength(0);

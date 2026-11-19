@@ -157,7 +157,8 @@ export async function executeAuthorizedControlledFixture(input:Readonly<{
  runner:(args:{profile:ControlledProfile;mode:"web"|"api";
    scope:{jobId:string;organizationId:string;assetId:string;actorId:string;
      origin:string;scopeHash:string};signal:AbortSignal;
-     authorized:PlanExecutionSnapshot})=>Promise<ControlledResult>;
+     authorized:PlanExecutionSnapshot;claimGeneration:number;
+     workerId:string})=>Promise<ControlledResult>;
  now?:()=>number;
 }>):Promise<Readonly<{jobId:string;observations:number;result:ControlledResult}>>{
  const now=input.now??Date.now;
@@ -230,7 +231,8 @@ export async function executeAuthorizedControlledFixture(input:Readonly<{
      scope:{jobId:claim.jobId,organizationId:scope.organizationId,
        assetId:scope.assetId,actorId:scope.actorId,origin:scope.origin,
        scopeHash:scope.scopeHash},signal:controller.signal,
-     authorized:verified.scope,
+     authorized:verified.scope,claimGeneration:claim.generation,
+     workerId:claim.workerId,
    });
    if(controller.signal.aborted)deny("PLAN_EXECUTION_CANCELLED");
    await recheck();

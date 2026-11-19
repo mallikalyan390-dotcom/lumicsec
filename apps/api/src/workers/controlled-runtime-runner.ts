@@ -6,6 +6,9 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { extname,dirname,join } from "node:path";
+import {tmpdir} from "node:os";
+import {createBrokerSigningKeys,signControlledBrokerScope}
+  from "./broker-scope-ticket.js";
 import { controlledStartSchema, parseControlledResult,
   CONTROLLED_RUNTIME_VERSION, type ControlledResult } from "./controlled-runtime-contract.js";
 import { openControlledRuntimeBroker, fixtureOrigin,
@@ -27,11 +30,15 @@ export async function runControlledRuntimeFixture(input:Readonly<{
   brokerIsolation?:"host_fixture"|"confined_fixture";
   planScope?:Readonly<{approvedPaths:readonly string[];maxRequests:number;
     maxResponseBytes:number;maxTotalBytes:number;maxExecutionMs:number}>;
+  brokerClaim?:Readonly<{planId:string;workerId:string;generation:number;
+    notAfterMs:number}>;
   onBrokerReady?:(containerName:string)=>void;
 }>):Promise<Readonly<{result:ControlledResult;requests:number;bytes:number;
   externalRequests:0;brokerNetworkMode:"host"|"none"}>>{
   if(input.planScope&&input.brokerIsolation!=="confined_fixture")
     throw Error("CONTROLLED_PLAN_REQUIRES_CONFINED_BROKER");
+  if(Boolean(input.planScope)!==Boolean(input.brokerClaim))
+    throw Error("CONTROLLED_PLAN_SIGNED_BROKER_ADMISSION_REQUIRED");
   if(active.has(input.scope.jobId)||active.size>=2||input.signal.aborted ||
     (input.mode==="web")!==(input.profile.startsWith("web_"))||
     input.scope.origin!==fixtureOrigin(input.profile))
@@ -52,12 +59,41 @@ export async function runControlledRuntimeFixture(input:Readonly<{
       protocol:CONTROLLED_RUNTIME_VERSION,type:"START",
       executionId:randomUUID(),mode:input.mode,scope:input.scope,
     });
+    let admission:Readonly<{signed:ReturnType<typeof signControlledBrokerScope>;
+      publicKeyPem:string;durableReplayDirectory:string;
+      expected:Readonly<{jobId:string;planId:string;workerId:string;
+       generation:number;scopeHash:string}>}>|undefined;
+    if(input.planScope&&input.brokerClaim){
+      const {privateKey,publicKeyPem}=createBrokerSigningKeys();
+      const signed=signControlledBrokerScope({
+        executionId:start.executionId,jobId:input.scope.jobId,
+        planId:input.brokerClaim.planId,
+        workerId:input.brokerClaim.workerId,
+        generation:input.brokerClaim.generation,scopeHash:input.scope.scopeHash,
+        origin:input.scope.origin,profile:input.profile,
+        approvedPaths:[...input.planScope.approvedPaths],
+        maxRequests:input.planScope.maxRequests,
+        maxResponseBytes:input.planScope.maxResponseBytes,
+        maxTotalBytes:input.planScope.maxTotalBytes,
+        maxExecutionMs:input.planScope.maxExecutionMs,
+      },privateKey,Date.now(),input.brokerClaim.notAfterMs);
+      // Only nonce digests are stored; the private signing key stays on the
+      // trusted launcher host and is never sent to broker or worker.
+      admission={signed,publicKeyPem,
+        expected:{jobId:input.scope.jobId,planId:input.brokerClaim.planId,
+          workerId:input.brokerClaim.workerId,
+          generation:input.brokerClaim.generation,
+          scopeHash:input.scope.scopeHash},
+        durableReplayDirectory:join(tmpdir(),
+          "lumicsec-broker-replay-"+input.scope.jobId)};
+    }
     broker=input.brokerIsolation==="confined_fixture"
       ?await openConfinedRuntimeBroker({
         executionId:start.executionId,origin:input.scope.origin,
         profile:input.profile,signal:controller.signal,
         bundlePath:join(dirname(bundle),"confined-broker.mjs"),
         ...(input.planScope?{planScope:input.planScope}:{}),
+        ...(admission?{brokerAdmission:admission}:{}),
       })
       :await openControlledRuntimeBroker({
         executionId:start.executionId,origin:input.scope.origin,

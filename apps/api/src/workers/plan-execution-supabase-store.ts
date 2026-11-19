@@ -76,7 +76,8 @@ export async function runTrustedPlanFixture(input:Readonly<{
    planId:input.planId,organizationId:input.organizationId,
    actor:input.actor,requestId:input.requestId,workerId:input.workerId,
    profile:input.profile,signal:input.signal,
-   runner:async({profile,mode,scope,signal,authorized})=>{
+   runner:async({profile,mode,scope,signal,authorized,
+     claimGeneration,workerId})=>{
      const run=await runControlledRuntimeFixture({
        profile,mode,scope,bundlePath:input.bundlePath,signal,
        brokerIsolation:"confined_fixture",
@@ -86,6 +87,10 @@ export async function runTrustedPlanFixture(input:Readonly<{
          maxTotalBytes:authorized.maxTotalBytes,
          maxExecutionMs:authorized.maxExecutionMs,
        },
+       brokerClaim:{planId:authorized.planId,workerId,
+         generation:claimGeneration,
+         notAfterMs:Math.min(Date.parse(authorized.planExpiresAt),
+           Date.parse(authorized.proofExpiresAt))},
      });
      if(run.brokerNetworkMode!=="none"||run.externalRequests!==0||
         run.requests>authorized.maxRequests||run.bytes>authorized.maxTotalBytes||

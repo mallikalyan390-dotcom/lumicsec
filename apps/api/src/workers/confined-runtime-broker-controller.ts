@@ -5,12 +5,13 @@
  */
 import {spawn,execFileSync,type ChildProcess} from "node:child_process";
 import {randomUUID} from "node:crypto";
-import {chmod,mkdir,mkdtemp,realpath,rm,stat} from "node:fs/promises";
+import {chmod,mkdir,mkdtemp,realpath,rm,stat,lstat,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {setTimeout as pause} from "node:timers/promises";
 import {z} from "zod";
 import {fixtureOrigin,type ControlledProfile} from "./controlled-runtime-broker.js";
+import type {BrokerSignedTicket} from "./broker-scope-ticket.js";
 
 const IMAGE="sha256:35e7c432242067a653e10bd96d9de5913ad35e60b884f2245ec7e43a41dc38f2";
 const profiles=["web_insecure","web_secure","web_redirect","web_oversize","web_slow",
@@ -31,6 +32,10 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
   bundlePath:string;signal:AbortSignal;
   planScope?:Readonly<{approvedPaths:readonly string[];maxRequests:number;
     maxResponseBytes:number;maxTotalBytes:number;maxExecutionMs:number}>;
+  brokerAdmission?:Readonly<{signed:BrokerSignedTicket;publicKeyPem:string;
+    durableReplayDirectory:string;
+    expected:Readonly<{jobId:string;planId:string;workerId:string;
+     generation:number;scopeHash:string}>}>;
 }>){
   if(!z.string().uuid().safeParse(input.executionId).success||
     input.origin!==fixtureOrigin(input.profile)||input.signal.aborted)
@@ -46,6 +51,16 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
     new Set(scoped.data.approvedPaths).size!==scoped.data.approvedPaths.length||
     scoped.data.maxTotalBytes<scoped.data.maxResponseBytes)))
     throw Error("CONFINED_BROKER_PLAN_SCOPE_DENIED");
+  if(scoped.data&&!input.brokerAdmission)
+    throw Error("CONFINED_BROKER_SIGNED_SCOPE_REQUIRED");
+  if(input.brokerAdmission&&!scoped.data)
+    throw Error("CONFINED_BROKER_SIGNED_SCOPE_REQUIRED");
+  if(input.brokerAdmission&&(
+    Buffer.byteLength(input.brokerAdmission.publicKeyPem)>2000||
+    Buffer.byteLength(JSON.stringify(input.brokerAdmission.signed))>3500||
+    !/^\/tmp\/lumicsec-broker-replay-[a-f0-9-]{36}$/.test(
+      input.brokerAdmission.durableReplayDirectory)))
+    throw Error("CONFINED_BROKER_ADMISSION_BOUNDS");
   const bundle=await realpath(input.bundlePath);
   if(!bundle.endsWith("/dist/isolated/confined-broker.mjs")||
     !(await stat(bundle)).isFile())throw Error("CONFINED_BROKER_BUNDLE_DENIED");
@@ -66,6 +81,21 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
     execFileSync("/bin/setfacl",["-m","u:65534:rwx",socketDirectory],{
       env:limitedEnv,stdio:"ignore",timeout:2500,
     });
+    if(input.brokerAdmission){
+      const ledger=input.brokerAdmission.durableReplayDirectory;
+      await mkdir(ledger,{recursive:true,mode:0o700});
+      const ledgerStat=await lstat(ledger);
+      if(!ledgerStat.isDirectory()||ledgerStat.isSymbolicLink()||
+        typeof process.getuid!=="function"||ledgerStat.uid!==process.getuid()||
+        (ledgerStat.mode&0o007)!==0)
+        throw Error("CONFINED_BROKER_UNTRUSTED_REPLAY_LEDGER");
+      await chmod(ledger,0o700);
+      execFileSync("/bin/setfacl",["-m","u:65534:rwx",ledger],{
+        env:limitedEnv,stdio:"ignore",timeout:2500,
+      });
+      await writeFile(join(directory,"public-key.pem"),
+        input.brokerAdmission.publicKeyPem,{mode:0o444,flag:"wx"});
+    }
     if(input.signal.aborted)throw Error("CONFINED_BROKER_CANCELLED");
     const args=[
       "run","--rm","--pull","never","--name",containerName,
@@ -82,6 +112,17 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
       "--env","LUMICSEC_BROKER_EXECUTION_ID="+input.executionId,
       ...(scoped.data?[ "--env","LUMICSEC_BROKER_SCOPED="+
         JSON.stringify(scoped.data) ]:[]),
+      ...(input.brokerAdmission?[
+        "--env","LUMICSEC_BROKER_REQUIRE_TICKET=yes",
+        "--env","LUMICSEC_BROKER_EXPECTED="+Buffer.from(
+          JSON.stringify(input.brokerAdmission.expected)).toString("base64url"),
+        "--env","LUMICSEC_BROKER_SIGNED_TICKET="+Buffer.from(
+          JSON.stringify(input.brokerAdmission.signed)).toString("base64url"),
+        "--mount","type=bind,src="+join(directory,"public-key.pem")+
+          ",dst=/opt/lumicsec-admission/public-key.pem,readonly",
+        "--mount","type=bind,src="+input.brokerAdmission.durableReplayDirectory+
+          ",dst=/opt/lumicsec-ticket-ledger",
+      ]:[]),
       "--entrypoint","/usr/bin/node",IMAGE,"/opt/lumicsec-runtime/broker.mjs",
     ];
     container=spawn("docker",args,{env:limitedEnv,stdio:["ignore","pipe","pipe"]});
@@ -97,7 +138,7 @@ export async function openConfinedRuntimeBroker(input:Readonly<{
       child.on("error",()=>fail(Error("CONFINED_BROKER_DOCKER_FAILED")));
       child.on("close",()=>{stopped=true;complete=true;
         if(!ready)fail(Error("CONFINED_BROKER_EXIT_BEFORE_READY"));});
-      child.stderr?.on("data",()=>undefined); // never echo worker or credential data
+      child.stderr?.on("data",()=>undefined); // no raw diagnostics or secrets
       child.stdout?.on("data",(part:Buffer)=>{
         lineBuffer+=part.toString("utf8");
         if(Buffer.byteLength(lineBuffer)>4000)
