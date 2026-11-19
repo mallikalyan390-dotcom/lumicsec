@@ -40,7 +40,7 @@
 6. **Rollback-only actual development PostgreSQL:** `supabase/tests/offline-api-assessments.sql` PASS including valid result writes, duplicate-completion rejection, cross-tenant and AAL1 isolation, pending/revoked ownership denial, mid-execution revocation, evidence caps and no partial invalid evidence writes. Existing `tenant-isolation.sql` and `rbac-ownership.sql` also PASS unchanged. No synthetic user, tenant, asset or job persisted.
 7. Compiled Chromium React UI via `apps/web/tests/offline-api-assessment-smoke.mjs`: **3 synthetic scenarios passed**: owner consent/upload/result/history/evidence, member read-only access, and unverified asset denial. Browser sent one synthetic authorized submission, no external target request. Browser fixture tested the built JS, not real Supabase login.
 8. Existing ownership resolver/SSRF tests remain included in API 133/133; this checkpoint did **not** implement a new network transport, so runtime DNS rebinding/SSRF qualification is NOT satisfied.
-9. Commit SHA and exact-HEAD GitHub CI results must be added following push.
+9. Implementation GitHub commit `f12550a51ceaf1e0d6f473145e08e077919f5402` with tree `b83967b0a7c6f3023ee9f256d85f175d01325ad6`, matching local tested tree. Exact-commit GitHub Actions CI `44439592795` SUCCESS; Lockfile verification `44439592887` SUCCESS. Local founder checkout `main` synchronized cleanly; frontend/backend HTTP 200.
 
 ## Security and release limitations
 
