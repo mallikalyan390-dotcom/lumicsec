@@ -34,6 +34,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+/** Authenticated, no-store GET for tenant-filtered assessment history. */
+export function getJson<T>(path: string) {
+  return requestJson<T>(path);
+}
+
 export function getAuthSession() {
   return requestJson<AuthSessionResponse>("/auth/session");
 }

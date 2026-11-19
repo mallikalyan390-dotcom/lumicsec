@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ApiSpecAssessmentResponse } from "@lumicsec/shared";
 import { MAX_SPEC_BYTES } from "@lumicsec/validation";
 import { Badge } from "../components/ui/Badge.js";
+import { SavedAssessmentsPanel } from "../components/SavedAssessmentsPanel.js";
 import { Button } from "../components/ui/Button.js";
 import { Card, CardContent, CardHeader } from "../components/ui/Card.js";
 import { getAuthSession, postJson } from "../lib/api.js";
@@ -43,6 +44,8 @@ export function ApiSecurityPage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Specification assessment</h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">Import an OpenAPI or Swagger document to inventory operations and review deterministic security observations. The document is processed offline and is not saved.</p>
       </section>
+
+      <SavedAssessmentsPanel />
 
       <Card>
         <CardHeader className="flex items-center gap-3">

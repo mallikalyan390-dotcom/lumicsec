@@ -10,6 +10,7 @@ import { apiSpecRoutes } from "./routes/api-specs.js";
 import { customerWorkspaceRoutes } from "./routes/customer-workspace.js";
 import { organizationManagementRoutes } from "./routes/organization-management.js";
 import { assetVerificationRoutes } from "./routes/asset-verification.js";
+import { offlineAssessmentRoutes } from "./routes/offline-assessments.js";
 
 export function buildApp() {
   const app = Fastify({
@@ -62,6 +63,7 @@ export function buildApp() {
   app.register(customerWorkspaceRoutes);
   app.register(organizationManagementRoutes);
   app.register(assetVerificationRoutes);
+  app.register(offlineAssessmentRoutes);
 
   app.setNotFoundHandler(async (_request, reply) => {
     return reply.code(404).send({ error: "NOT_FOUND" });

@@ -13,4 +13,4 @@ The following founder-controlled source repositories were inspected and selectiv
 
 No LICENSE, NOTICE or COPYING file was found in the inspected source branch trees. These repositories were supplied as the founder's own development sources. This file is a provenance record, not a new open-source licence grant. Preserve source attribution and do not redistribute the reused modules under an assumed third-party licence.
 
-The copied modules have not yet passed this target repository's own CI. Their source-repository test evidence is documented separately and does not qualify the LumicSec integration as production-ready.
+The reused modules have passed target-repository unit tests and CI at earlier development checkpoints; additional integrations require their own exact-commit CI verification. Neither source-repository nor target test evidence independently qualifies the hosted commercial platform as production-ready.
