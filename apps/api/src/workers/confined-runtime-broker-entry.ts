@@ -3,6 +3,7 @@
  * directory is shared with the independently network-none worker.
  */
 import {z} from "zod";
+import {createHash} from "node:crypto";
 import {readFile,open} from "node:fs/promises";
 import {verifyControlledBrokerScope,type BrokerSignedTicket}
  from "./broker-scope-ticket.js";
@@ -37,6 +38,7 @@ async function main(){
   const origin=fixtureOrigin(profile as ControlledProfile);
   const signedEnv=process.env["LUMICSEC_BROKER_SIGNED_TICKET"];
   let signedScope=undefined as typeof scoped;
+  let signedDestination:Readonly<{ipv4:string;caSha256:string}>|undefined;
   if(rawScope&&!signedEnv)
     throw Error("BROKER_SIGNED_TICKET_REQUIRED");
   if(signedEnv){
@@ -56,6 +58,7 @@ async function main(){
     const checked=verifyControlledBrokerScope(signed,pem,{
       executionId,origin,profile,...expected,
     });
+    signedDestination=checked.scope.controlledFixtureDestination;
     signedScope=scopedSchema.parse({
       approvedPaths:checked.scope.approvedPaths,
       maxRequests:checked.scope.maxRequests,
@@ -75,11 +78,33 @@ async function main(){
   }else if(process.env["LUMICSEC_BROKER_REQUIRE_TICKET"]==="yes"){
     throw Error("BROKER_SIGNED_TICKET_REQUIRED");
   }
+  // Only a signed, tightly scoped controlled Web fixture may use a remote
+  // synthetic Docker bridge address. The normal network-none path is intact.
+  const remoteIp=process.env["LUMICSEC_BROKER_REMOTE_FIXTURE_IP"];
+  if(remoteIp&&(
+    process.env["LUMICSEC_BROKER_REMOTE_FIXTURE_ACCEPTED"]!=="yes"||
+    process.env["LUMICSEC_BROKER_REQUIRE_TICKET"]!=="yes"||
+    !signedEnv||!signedScope||profile!=="web_insecure"||
+    signedScope.approvedPaths.length!==1||
+    signedScope.approvedPaths[0]!=="/"))
+    throw Error("BROKER_REMOTE_FIXTURE_SIGNED_SCOPE_REQUIRED");
+  if(Boolean(remoteIp)!==Boolean(signedDestination)||
+    remoteIp&&signedDestination?.ipv4!==remoteIp)
+    throw Error("BROKER_REMOTE_FIXTURE_SIGNED_SCOPE_REQUIRED");
+  const caPem=remoteIp?
+    await readFile("/opt/lumicsec-broker-ca/certificate.crt"):undefined;
+  if(caPem&&createHash("sha256").update(caPem).digest("hex")!==
+    signedDestination?.caSha256)
+    throw Error("BROKER_REMOTE_FIXTURE_SIGNED_SCOPE_REQUIRED");
+  const remoteFixture=remoteIp&&caPem?{
+    pinnedIpv4:remoteIp,caPem,
+  }:undefined;
   const aborter=new AbortController();
   const broker=await openControlledRuntimeBroker({
     profile:profile as ControlledProfile,origin,executionId,
     signal:aborter.signal,socketDirectory:"/opt/lumicsec-broker",
     ...(signedScope??scoped),
+    ...(remoteFixture?{remoteFixture}:{}),
     onStatistics:metric=>process.stdout.write("CONTROLLED_BROKER_METRICS "+
       JSON.stringify(metric)+"\n"),
   });
@@ -99,7 +124,7 @@ main().catch(error=>{
   const labels=["BROKER_SIGNED_TICKET_REQUIRED","BROKER_SIGNED_SIGNATURE_INVALID",
     "BROKER_SIGNED_SCOPE_EXPIRED_OR_INVALID","BROKER_SIGNED_EXPECTED_SCOPE_MISMATCH",
     "BROKER_UNSIGNED_SCOPE_MISMATCH","BROKER_CONTROLLED_FIXTURE_SETUP_REJECTED",
-    "BROKER_REMOTE_FIXTURE_SIGNED_SCOPE_REQUIRED","BROKER_REMOTE_TLS_REQUIRES_SIGNED_FIXTURE_SCOPE"];
+    "BROKER_REMOTE_FIXTURE_SIGNED_SCOPE_REQUIRED","BROKER_REMOTE_FIXTURE_SCOPE_DENIED"];
   const label=labels.find(code=>message.includes(code))??"BROKER_SETUP_OR_SCHEMA_DENIED";
   process.stderr.write("CONFINED_BROKER_REJECTED "+label+"\n");
   process.exitCode=1;

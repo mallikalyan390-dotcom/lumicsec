@@ -7,6 +7,7 @@
  */
 import {createHash,generateKeyPairSync,sign,verify,
   createPublicKey,type KeyObject} from "node:crypto";
+import {isIP} from "node:net";
 import {z} from "zod";
 const uuid=z.string().uuid(),hex=z.string().regex(/^[a-f0-9]{64}$/);
 const path=z.string().regex(/^\/[a-zA-Z0-9._~/-]{0,119}$/);
@@ -22,6 +23,11 @@ export const brokerSignedScopeSchema=z.strictObject({
   maxResponseBytes:z.number().int().min(1024).max(60000),
   maxTotalBytes:z.number().int().min(1024).max(240000),
   maxExecutionMs:z.number().int().min(1000).max(15000),
+  // Optional signed binding exclusively for a synthetic --internal bridge.
+  // The broker refuses a remote CA or destination not signed here.
+  controlledFixtureDestination:z.strictObject({
+    ipv4:z.string().max(45),caSha256:hex,
+  }).optional(),
   issuedAt:z.number().int(),expiresAt:z.number().int(),
   nonce:hex,
 });
@@ -53,6 +59,14 @@ export function signControlledBrokerScope(
    .toString("base64url")};
 }
 function validateScope(scope:BrokerSignedScope,nowMs:number){
+ const fixture=scope.controlledFixtureDestination;
+ if(fixture&&(
+   scope.profile!=="web_insecure"||
+   scope.approvedPaths.length!==1||scope.approvedPaths[0]!=="/"||
+   isIP(fixture.ipv4)!==4||
+   !/^(?:172\.(?:1[6-9]|2\d|3[01])\.|10\.|192\.168\.)/.test(
+     fixture.ipv4)))
+   deny("BROKER_SIGNED_REMOTE_DESTINATION_INVALID");
  if(!Number.isFinite(nowMs)||scope.issuedAt>nowMs+500||
    scope.expiresAt<=nowMs||scope.expiresAt-scope.issuedAt>9000||
    scope.expiresAt<=scope.issuedAt||

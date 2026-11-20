@@ -3,7 +3,7 @@
  * This module is deliberately NOT reachable from customer API routes or
  * runtime workers. No cloud, real domain, customer identities or secrets.
  */
-import { createServer as createUnixServer, type Server as UnixServer } from "node:net";
+import { createServer as createUnixServer, isIP, type Server as UnixServer } from "node:net";
 import { createServer as createHttpsServer, request as httpsRequest,
   type Server as TlsServer, type RequestOptions } from "node:https";
 import { execFileSync } from "node:child_process";
@@ -60,6 +60,11 @@ export async function openControlledRuntimeBroker(input:Readonly<{
   maxExecutionMs?:number;
   /** Only the test-only broker container may mount this fixed AF_UNIX path. */
   socketDirectory?:"/opt/lumicsec-broker";
+  /** Test-only Docker --internal fixture: never supplied by public API or
+   * any production worker. Caller must independently install kernel nft DROP.
+   * This local CA is synthetic; it does not qualify public DNS or PKI.
+   */
+  remoteFixture?:Readonly<{pinnedIpv4:string;caPem:Buffer}>;
   onStatistics?:(stats:Readonly<{requests:number;bytes:number;failures:number;
     active:number;externalRequests:0;profile:ControlledProfile}>)=>void;
 }>) {
@@ -72,6 +77,17 @@ export async function openControlledRuntimeBroker(input:Readonly<{
     input.approvedPaths.some(p=>!/^\/[a-zA-Z0-9._~/-]{0,119}$/.test(p)||
       p.includes("//")||/(^|\/)\.{1,2}(\/|$)/.test(p))))
     throw Error("BROKER_PLAN_PATH_SCOPE_DENIED");
+  if(input.remoteFixture&&(
+    input.profile!=="web_insecure"||
+    input.approvedPaths?.length!==1||input.approvedPaths[0]!=="/"||
+    isIP(input.remoteFixture.pinnedIpv4)!==4||
+    !/^(?:172\.(?:1[6-9]|2\d|3[01])\.|10\.|192\.168\.)/.test(
+      input.remoteFixture.pinnedIpv4)||
+    input.remoteFixture.caPem.length<200||
+    input.remoteFixture.caPem.length>8192||
+    !input.remoteFixture.caPem.toString("utf8").includes(
+      "-----BEGIN CERTIFICATE-----")))
+    throw Error("BROKER_REMOTE_FIXTURE_SCOPE_DENIED");
   if(input.maxRequests!==undefined&&(input.maxRequests<1||input.maxRequests>6)||
     input.maxResponseBytes!==undefined&&
       (input.maxResponseBytes<1024||input.maxResponseBytes>60000)||
@@ -103,6 +119,29 @@ export async function openControlledRuntimeBroker(input:Readonly<{
   input.signal.addEventListener("abort",failClosed,{once:true});
   try{
     const hostname=new URL(origin).hostname;
+    let factory:HttpsRequestFactory;
+    if(input.remoteFixture){
+      // The fixture address is a private IP on a disposable --internal Docker
+      // bridge. The trust anchor is a synthetic test SAN certificate ONLY.
+      // The one-shot nft installer and signed broker admission are mandatory
+      // external preconditions and are independently qualified in Docker.
+      const pinned=input.remoteFixture.pinnedIpv4;
+      const ca=input.remoteFixture.caPem;
+      factory=(opts:RequestOptions,callback)=>httpsRequest({
+        ...opts,port:443,ca,rejectUnauthorized:true,
+        lookup:(name,settings,answer)=>{
+          if(name!==hostname){
+            answer(Error("BROKER_REMOTE_FIXTURE_HOSTNAME_DENIED"),"",4);
+            return;
+          }
+          if(settings.all){
+            const all=answer as (err:Error|null,
+              values:{address:string;family:number}[])=>void;
+            all(null,[{address:pinned,family:4}]);
+          }else answer(null,pinned,4);
+        },
+      },callback);
+    }else{
     execFileSync("/usr/bin/openssl",["req","-x509","-newkey","rsa:2048","-nodes",
       "-keyout",keyPath,"-out",certPath,"-days","1","-subj","/CN="+hostname,
       "-addext","subjectAltName=DNS:"+hostname],{stdio:"ignore",timeout:4_000});
@@ -166,7 +205,7 @@ export async function openControlledRuntimeBroker(input:Readonly<{
     });
     const address=tls.address();
     if(!address||typeof address==="string")throw Error("BROKER_FIXTURE_LISTEN_FAILED");
-    const factory:HttpsRequestFactory=(opts:RequestOptions,callback)=>httpsRequest({
+    factory=(opts:RequestOptions,callback)=>httpsRequest({
       ...opts,port:address.port,ca:certificate,
       lookup:(_host,settings,answer)=>{
         if(settings.all){
@@ -175,6 +214,7 @@ export async function openControlledRuntimeBroker(input:Readonly<{
         }else answer(null,"127.0.0.1",4);
       },
     },callback);
+    }
     // Non-public test-only socket substitution (never available to customer).
     // Production PublicPinnedWebTransport retains its public-only DNS + IP pinning.
     const transport=new PublicPinnedWebTransport(
@@ -258,7 +298,7 @@ export async function openControlledRuntimeBroker(input:Readonly<{
         for(const socket of sockets)socket.destroy();
         await Promise.all([
           new Promise<void>(ok=>unix?.close(()=>ok())),
-          new Promise<void>(ok=>tls?.close(()=>ok())),
+          ...(tls?[new Promise<void>(ok=>tls!.close(()=>ok()))]:[]),
         ]);
         input.signal.removeEventListener("abort",failClosed);
         await rm(directory,{recursive:true,force:true});

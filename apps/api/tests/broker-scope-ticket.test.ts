@@ -82,6 +82,40 @@ describe("signed broker-side admission: Ed25519 detached signature and generatio
       key.privateKey,now)).toThrow();
   }
  });
+ it("binds synthetic remote fixture IP and CA fingerprint inside Ed25519 scope",()=>{
+  const remote={ipv4:"172.20.0.2",caSha256:"b".repeat(64)};
+  const c={...claims(),controlledFixtureDestination:remote};
+  const key=createBrokerSigningKeys(),now=Date.now();
+  const envelope=signControlledBrokerScope(c,key.privateKey,now);
+  const read=verifyControlledBrokerScope(envelope,key.publicKeyPem,expected(c),now);
+  expect(read.scope.controlledFixtureDestination).toEqual(remote);
+  for(const mutated of [
+    {ipv4:"172.20.0.3",caSha256:remote.caSha256},
+    {ipv4:remote.ipv4,caSha256:"c".repeat(64)},
+  ]){
+    const body=JSON.stringify({
+      ...JSON.parse(envelope.body),controlledFixtureDestination:mutated,
+    });
+    expect(()=>verifyControlledBrokerScope({...envelope,body},
+      key.publicKeyPem,expected(c),now)).toThrow(
+        "BROKER_SIGNED_SIGNATURE_INVALID");
+  }
+ });
+ it("refuses public, metadata, loopback and out-of-scope remote fixture grants",()=>{
+  const key=createBrokerSigningKeys();
+  const remote={ipv4:"172.20.0.2",caSha256:"b".repeat(64)};
+  for(const change of [
+    {controlledFixtureDestination:{...remote,ipv4:"1.1.1.1"}},
+    {controlledFixtureDestination:{...remote,ipv4:"169.254.169.254"}},
+    {controlledFixtureDestination:{...remote,ipv4:"127.0.0.1"}},
+    {controlledFixtureDestination:{...remote,ipv4:"::ffff:172.20.0.2"}},
+    {controlledFixtureDestination:remote,profile:"api_insecure" as const},
+    {controlledFixtureDestination:remote,approvedPaths:["/admin"]},
+  ]){
+    expect(()=>signControlledBrokerScope({...claims(),...change},
+      key.privateKey)).toThrow();
+  }
+ });
  it("session nonce changes each signing of identical claims, never a replay token",()=>{
   const c=claims(),key=createBrokerSigningKeys(),now=Date.now();
   const a=signControlledBrokerScope(c,key.privateKey,now);
